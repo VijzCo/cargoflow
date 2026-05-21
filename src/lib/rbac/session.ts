@@ -26,7 +26,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     const decoded = await adminAuth.verifySessionCookie(cookie, true);
     const snap = await adminDb.collection("users").doc(decoded.uid).get();
     if (!snap.exists) return null;
-    const data = snap.data() as UserDoc;
+    const data = snap.data() as unknown as UserDoc;
     if (!data.active) return null;
 
     return {

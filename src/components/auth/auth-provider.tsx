@@ -42,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const snap = await getDoc(doc(db, "users", fbUser.uid));
         if (snap.exists()) {
-          setUserDoc({ id: snap.id, ...snap.data() } as UserDoc);
+          setUserDoc({ id: snap.id, ...snap.data() } as unknown as UserDoc);
         }
       } catch (err) {
         console.error("Failed to load user doc:", err);
@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const ref = doc(db, "users", firebaseUser.uid);
     const unsub = onSnapshot(ref, (snap) => {
       if (snap.exists()) {
-        setUserDoc({ id: snap.id, ...snap.data() } as UserDoc);
+        setUserDoc({ id: snap.id, ...snap.data() } as unknown as UserDoc);
       }
     });
     return unsub;
