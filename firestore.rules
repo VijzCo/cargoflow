@@ -1,0 +1,144 @@
+rules_version = '2';
+
+// =============================================================================
+// CargoFlow Firestore Security Rules
+// =============================================================================
+// Roles:
+//   - super_admin : full access
+//   - merchant    : POs, vessels, packing lists, all suppliers
+//   - supplier    : only assigned po_items (filtered by supplierId)
+//   - logistics   : containers, vessels, packing-list operations
+//   - viewer      : read-only dashboards
+// =============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- Helpers ----------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    function isActive() {
+      return isSignedIn() && userDoc().active == true;
+    }
+    function hasRole(role) {
+      return isActive() && userDoc().role == role;
+    }
+    function hasAnyRole(roles) {
+      return isActive() && userDoc().role in roles;
+    }
+    function isSuperAdmin() { return hasRole('super_admin'); }
+    function isMerchant()   { return hasRole('merchant'); }
+    function isSupplier()   { return hasRole('supplier'); }
+    function isLogistics()  { return hasRole('logistics'); }
+    function isViewer()     { return hasRole('viewer'); }
+    function canManage()    { return hasAnyRole(['super_admin', 'merchant']); }
+    function canReadAll()   { return hasAnyRole(['super_admin', 'merchant', 'logistics', 'viewer']); }
+
+    // ---------- users ----------
+    // Only super_admin can create / update / delete users.
+    // Anyone signed-in can read their own user doc.
+    match /users/{uid} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isSuperAdmin());
+      allow create, update, delete: if isSuperAdmin();
+    }
+
+    // ---------- suppliers ----------
+    // Merchants and admins manage. Suppliers can read only their own supplier doc.
+    match /suppliers/{supplierId} {
+      allow read: if canReadAll()
+                  || (isSupplier() && userDoc().supplierId == supplierId);
+      allow create, update, delete: if canManage();
+    }
+
+    // ---------- merchants (master list of customer/merchant entities) ----------
+    match /merchants/{merchantId} {
+      allow read: if canReadAll();
+      allow create, update, delete: if canManage();
+    }
+
+    // ---------- purchase_orders (header records) ----------
+    match /purchase_orders/{poId} {
+      allow read: if canReadAll()
+                  || (isSupplier() && resource.data.supplierId == userDoc().supplierId);
+      allow create, update: if canManage();
+      allow delete: if isSuperAdmin();
+    }
+
+    // ---------- po_items (one row per item) ----------
+    // Suppliers can read AND update STATUS/CBM/REMARKS only on their own items.
+    match /po_items/{itemId} {
+      allow read: if canReadAll()
+                  || (isSupplier() && resource.data.supplierId == userDoc().supplierId);
+      allow create: if canManage();
+      // Supplier may only update specific allowed fields on their own items.
+      allow update: if canManage()
+                    || (isSupplier()
+                        && resource.data.supplierId == userDoc().supplierId
+                        && request.resource.data.diff(resource.data).affectedKeys()
+                            .hasOnly(['status', 'cbm', 'packageCount', 'grossWeight',
+                                     'netWeight', 'supplierRemarks', 'updatedAt', 'updatedBy']));
+      allow delete: if isSuperAdmin();
+    }
+
+    // ---------- containers ----------
+    match /containers/{containerId} {
+      allow read: if canReadAll()
+                  || (isSupplier() && resource.data.supplierIds.hasAny([userDoc().supplierId]));
+      allow create, update: if hasAnyRole(['super_admin', 'merchant', 'logistics']);
+      allow delete: if isSuperAdmin();
+    }
+
+    // ---------- vessels ----------
+    match /vessels/{vesselId} {
+      allow read: if canReadAll()
+                  || (isSupplier() && resource.data.supplierIds.hasAny([userDoc().supplierId]));
+      allow create, update: if canManage();
+      allow delete: if isSuperAdmin();
+    }
+
+    // ---------- packing_lists ----------
+    match /packing_lists/{plId} {
+      allow read: if canReadAll()
+                  || (isSupplier() && resource.data.supplierId == userDoc().supplierId);
+      allow create, update: if canManage();
+      allow delete: if isSuperAdmin();
+    }
+
+    // ---------- notifications ----------
+    // Each notification has a userId; users can only read/update their own.
+    match /notifications/{notifId} {
+      allow read, update: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn();
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    // ---------- sales_channels ----------
+    match /sales_channels/{channelId} {
+      allow read: if isActive();
+      allow create, update, delete: if isSuperAdmin();
+    }
+
+    // ---------- settings (singleton: settings/global) ----------
+    match /settings/{settingId} {
+      allow read: if isActive();
+      allow write: if isSuperAdmin();
+    }
+
+    // ---------- activity_logs (audit trail — write-only for non-admins) ----------
+    match /activity_logs/{logId} {
+      allow read: if isSuperAdmin();
+      allow create: if isSignedIn();
+      // Activity logs are immutable.
+      allow update, delete: if false;
+    }
+
+    // Default deny — explicit safety net.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
