@@ -5,6 +5,7 @@ import {
   doc,
   type CollectionReference,
   type DocumentReference,
+  type DocumentData,
   type FirestoreDataConverter,
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
@@ -15,19 +16,20 @@ import type {
   SalesChannelDoc, SettingsDoc, ActivityLogDoc,
 } from "@/types";
 
-// Generic converter that preserves the typed shape on the way out and just
-// passes objects through on the way in (we'll always write through helpers
-// that ensure timestamps & IDs are correct).
-function converter<T extends { id: string }>(): FirestoreDataConverter<T> {
+// Generic converter — accepts any document-shaped type. We don't constrain on
+// `{ id: string }` because most of our typed docs use `uid`, no id field, or
+// rely on the snapshot id directly.
+function converter<T extends DocumentData>(): FirestoreDataConverter<T> {
   return {
     toFirestore(data: T) {
-      // Don't write `id` into the document — it's only a read-side convenience.
-      const { id: _omit, ...rest } = data as { id: string } & Record<string, unknown>;
-      return rest;
+      // Strip the `id` key if present — Firestore stores IDs in the path,
+      // not in the document body.
+      const { id: _omit, ...rest } = data as Record<string, unknown>;
+      return rest as DocumentData;
     },
     fromFirestore(snapshot: QueryDocumentSnapshot): T {
       const data = snapshot.data();
-      return { id: snapshot.id, ...data } as T;
+      return { id: snapshot.id, ...data } as unknown as T;
     },
   };
 }
