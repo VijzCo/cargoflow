@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   LayoutDashboard, FileSpreadsheet, Factory, Container, Ship,
   Package, BarChart3, Users, Building2, Settings, History, Menu, X,
@@ -14,30 +15,32 @@ import { Button } from "@/components/ui/button";
 
 interface NavItem {
   href: string;
-  label: string;
+  /** Key into the `nav` translation namespace */
+  labelKey: "dashboard" | "purchaseOrders" | "production" | "containers" | "vessels" | "packingLists" | "reports" | "users" | "suppliers" | "activity" | "settings" | "admin";
   icon: React.ComponentType<{ className?: string }>;
   permissions: Permission[];
 }
 
 const NAV: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, permissions: [] }, // everyone
-  { href: "/purchase-orders", label: "Purchase Orders", icon: FileSpreadsheet, permissions: ["purchase_orders.view"] },
-  { href: "/production", label: "Production", icon: Factory, permissions: ["po_items.view"] },
-  { href: "/containers", label: "Containers", icon: Container, permissions: ["containers.view"] },
-  { href: "/vessels", label: "Vessels", icon: Ship, permissions: ["vessels.view"] },
-  { href: "/packing-lists", label: "Packing Lists", icon: Package, permissions: ["packing_lists.view"] },
-  { href: "/reports", label: "Reports", icon: BarChart3, permissions: ["reports.view"] },
+  { href: "/dashboard", labelKey: "dashboard", icon: LayoutDashboard, permissions: [] },
+  { href: "/purchase-orders", labelKey: "purchaseOrders", icon: FileSpreadsheet, permissions: ["purchase_orders.view"] },
+  { href: "/production", labelKey: "production", icon: Factory, permissions: ["po_items.view"] },
+  { href: "/containers", labelKey: "containers", icon: Container, permissions: ["containers.view"] },
+  { href: "/vessels", labelKey: "vessels", icon: Ship, permissions: ["vessels.view"] },
+  { href: "/packing-lists", labelKey: "packingLists", icon: Package, permissions: ["packing_lists.view"] },
+  { href: "/reports", labelKey: "reports", icon: BarChart3, permissions: ["reports.view"] },
 ];
 
 const ADMIN_NAV: NavItem[] = [
-  { href: "/admin/users", label: "Users", icon: Users, permissions: ["users.view"] },
-  { href: "/admin/suppliers", label: "Suppliers", icon: Building2, permissions: ["suppliers.view"] },
-  { href: "/admin/activity", label: "Activity Log", icon: History, permissions: ["activity_logs.view"] },
-  { href: "/admin/settings", label: "Settings", icon: Settings, permissions: ["settings.view"] },
+  { href: "/admin/users", labelKey: "users", icon: Users, permissions: ["users.view"] },
+  { href: "/admin/suppliers", labelKey: "suppliers", icon: Building2, permissions: ["suppliers.view"] },
+  { href: "/admin/activity", labelKey: "activity", icon: History, permissions: ["activity_logs.view"] },
+  { href: "/admin/settings", labelKey: "settings", icon: Settings, permissions: ["settings.view"] },
 ];
 
 export function Sidebar({ role }: { role: Role }) {
   const pathname = usePathname();
+  const t = useTranslations("nav");
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const visible = (items: NavItem[]) =>
@@ -105,7 +108,7 @@ export function Sidebar({ role }: { role: Role }) {
                   )}
                 >
                   <Icon className="h-4 w-4" />
-                  {item.label}
+                  {t(item.labelKey)}
                 </Link>
               );
             })}
@@ -114,7 +117,7 @@ export function Sidebar({ role }: { role: Role }) {
           {adminItems.length > 0 && (
             <>
               <div className="mt-6 px-3 pb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Administration
+                {t("admin")}
               </div>
               <div className="space-y-0.5">
                 {adminItems.map((item) => {
@@ -133,7 +136,7 @@ export function Sidebar({ role }: { role: Role }) {
                       )}
                     >
                       <Icon className="h-4 w-4" />
-                      {item.label}
+                      {t(item.labelKey)}
                     </Link>
                   );
                 })}

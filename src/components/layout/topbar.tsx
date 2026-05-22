@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
+import { useTranslations } from "next-intl";
 import { LogOut, Moon, Sun, Bell, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -14,13 +15,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/components/auth/auth-provider";
-import { ROLES } from "@/types";
+import { LanguageToggle } from "@/components/layout/language-toggle";
 import type { SessionUser } from "@/lib/rbac/session-shared";
 
 export function Topbar({ user }: { user: SessionUser }) {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const { signOut } = useAuth();
+  const tTop = useTranslations("topbar");
+  const tRoles = useTranslations("roles");
 
   async function handleSignOut() {
     try {
@@ -39,11 +42,13 @@ export function Topbar({ user }: { user: SessionUser }) {
       </div>
 
       <div className="flex items-center gap-2">
+        <LanguageToggle />
+
         <Button
           variant="ghost"
           size="icon"
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          aria-label="Toggle theme"
+          aria-label={tTop("themeToggle")}
         >
           <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
           <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
@@ -62,7 +67,7 @@ export function Topbar({ user }: { user: SessionUser }) {
               <div className="hidden text-left md:block">
                 <div className="text-sm font-medium leading-tight">{user.displayName || user.email}</div>
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                  {ROLES[user.role]?.label ?? user.role}
+                  {tRoles(user.role)}
                 </div>
               </div>
             </Button>
@@ -80,7 +85,7 @@ export function Topbar({ user }: { user: SessionUser }) {
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleSignOut}>
-              <LogOut className="mr-2 h-4 w-4" /> Sign out
+              <LogOut className="mr-2 h-4 w-4" /> {tTop("signOut")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

@@ -1,6 +1,7 @@
 import { getSessionUser } from "@/lib/rbac/session";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import {
   Package, Factory, Container as ContainerIcon, Ship, AlertTriangle, ArrowRight,
   Clock, CheckCircle2, Upload, Sparkles, BarChart3, FileText,
@@ -11,7 +12,6 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getDashboardData } from "@/lib/utils/dashboard-actions";
 import { hasPermission } from "@/lib/rbac/permissions";
-import { ROLES } from "@/types";
 import { formatNumber, formatDate, formatPercent } from "@/lib/utils/format";
 
 export default async function DashboardPage() {
@@ -19,63 +19,73 @@ export default async function DashboardPage() {
   if (!user) redirect("/login");
 
   const data = await getDashboardData();
-  const greeting = getGreeting();
-  const roleLabel = ROLES[user.role]?.label ?? user.role;
+  const t = await getTranslations("dashboard");
+  const tRoles = await getTranslations("roles");
+  const tTop = await getTranslations("topbar");
+
+  const greeting = getGreetingKey();
+  const greetingText = t(greeting);
+  const roleLabel = tRoles(user.role);
+  const tCommon = await getTranslations("common");
+  const tDashboardViewAll = tCommon("viewAll");
+  const tSupplierH = (await getTranslations("po"))("colSupplier");
+  const tStatusH = (await getTranslations("production"))("colStatus");
+  const tUpdatedH = "";
   const canUpload = hasPermission(user.role, "purchase_orders.upload");
   const canAllocate = hasPermission(user.role, "containers.assign");
 
   const isEmpty = data.totalPOs === 0;
+  const subtitleKey =
+    user.role === "supplier" ? "subtitleSupplier" :
+    user.role === "viewer"   ? "subtitleViewer" :
+    "subtitleAdmin";
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
-          {greeting}, {user.displayName?.split(" ")[0] || "there"}
+          {greetingText}, {user.displayName?.split(" ")[0] || ""}
         </h1>
         <p className="mt-1 text-muted-foreground">
-          Signed in as <span className="font-medium text-foreground">{roleLabel}</span>.
-          {user.role === "supplier"
-            ? " You can view and update production status for items assigned to you."
-            : user.role === "viewer"
-            ? " You have read-only access to dashboards and reports."
-            : " Here's a snapshot of your current operations."}
+          {tTop("signedInAs")} <span className="font-medium text-foreground">{roleLabel}</span>.
+          {" "}{t(subtitleKey)}
         </p>
       </div>
 
       {/* KPI tiles */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <KPICard
-          label="Total POs"
+          label={t("kpiTotalPOs")}
           value={isEmpty ? "—" : formatNumber(data.totalPOs)}
           icon={Package}
           accent="navy"
           href="/purchase-orders"
         />
         <KPICard
-          label="In Production"
+          label={t("kpiInProduction")}
           value={isEmpty ? "—" : formatNumber(data.inProductionCount)}
           icon={Factory}
           accent="indigo"
           href="/production"
-          subtitle={data.pendingCount > 0 ? `${data.pendingCount} pending` : undefined}
+          subtitle={data.pendingCount > 0 ? t("kpiPending", { count: data.pendingCount }) : undefined}
         />
         <KPICard
-          label="Container Utilization"
+          label={t("kpiContainerUtil")}
           value={data.openContainers + data.sealedContainers === 0 ? "—" : formatPercent(data.containerUtilization)}
           icon={ContainerIcon}
           accent="cyan"
           href="/containers"
           subtitle={data.openContainers > 0 || data.sealedContainers > 0
-            ? `${data.openContainers} open · ${data.sealedContainers} sealed`
+            ? t("containerStats", { open: data.openContainers, sealed: data.sealedContainers })
             : undefined}
         />
         <KPICard
-          label="Vessels in Transit"
+          label={t("kpiVesselsInTransit")}
           value={isEmpty ? "—" : formatNumber(data.vesselsInTransit)}
           icon={Ship}
           accent="emerald"
           href="/vessels"
-          subtitle={data.vesselsPlanned > 0 ? `${data.vesselsPlanned} planned` : undefined}
+          subtitle={data.vesselsPlanned > 0 ? t("kpiPlanned", { count: data.vesselsPlanned }) : undefined}
         />
       </div>
 
@@ -87,15 +97,15 @@ export default async function DashboardPage() {
               <AlertTriangle className="h-5 w-5 text-rose-600 dark:text-rose-400" />
               <div>
                 <p className="font-medium text-rose-900 dark:text-rose-200">
-                  {data.overdueCount} item{data.overdueCount === 1 ? " is" : "s are"} overdue
+                  {data.overdueCount === 1 ? t("overdueAlertSingle", { count: data.overdueCount }) : t("overdueAlertMany", { count: data.overdueCount })}
                 </p>
                 <p className="text-xs text-rose-800 dark:text-rose-300">
-                  Past delivery date and not yet Completed.
+                  {t("overdueSubtitle")}
                 </p>
               </div>
             </div>
             <Button asChild variant="outline" size="sm">
-              <Link href="/production?status=Pending">Review<ArrowRight className="h-3.5 w-3.5" /></Link>
+              <Link href="/production?status=Pending">{t("review")}<ArrowRight className="h-3.5 w-3.5" /></Link>
             </Button>
           </CardContent>
         </Card>
@@ -107,25 +117,25 @@ export default async function DashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-indigo-500" />
-              Get started
+              {t("getStarted")}
             </CardTitle>
             <CardDescription>
-              CargoFlow is ready. Upload your first PO and the dashboard will start populating.
+              {t("getStartedSubtitle")}
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2">
             <QuickLink
               href="/purchase-orders/upload"
               icon={Upload}
-              title="Upload a PO"
-              description="Excel parser handles legacy + template formats."
+              title={t("uploadAPO")}
+              description={t("uploadAPODesc")}
               disabled={!canUpload}
             />
             <QuickLink
               href="/admin/suppliers"
               icon={Package}
-              title="Add suppliers"
-              description="Set up supplier records before uploading POs."
+              title={t("addSuppliers")}
+              description={t("addSuppliersDesc")}
               disabled={!hasPermission(user.role, "suppliers.create")}
             />
           </CardContent>
@@ -137,27 +147,27 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
             <div>
-              <CardTitle className="text-base">Recent updates</CardTitle>
-              <CardDescription>Latest item status changes.</CardDescription>
+              <CardTitle className="text-base">{t("recentUpdates")}</CardTitle>
+              <CardDescription>{t("recentUpdatesDesc")}</CardDescription>
             </div>
             <Button asChild variant="ghost" size="sm">
-              <Link href="/production">View all<ArrowRight className="h-3 w-3" /></Link>
+              <Link href="/production">{tDashboardViewAll}<ArrowRight className="h-3 w-3" /></Link>
             </Button>
           </CardHeader>
           <CardContent className="p-0">
             {data.recentItems.length === 0 ? (
               <div className="flex flex-col items-center py-12 text-sm text-muted-foreground">
                 <Clock className="mb-2 h-6 w-6" />
-                No items yet.
+                {t("noItemsYet")}
               </div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Item</TableHead>
-                    <TableHead>Supplier</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Updated</TableHead>
+                    <TableHead>{t("recentUpdates")}</TableHead>
+                    <TableHead>{tSupplierH}</TableHead>
+                    <TableHead>{tStatusH}</TableHead>
+                    <TableHead>{tUpdatedH}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -183,18 +193,18 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
             <div>
-              <CardTitle className="text-base">Upcoming deliveries</CardTitle>
-              <CardDescription>Items due soon, not yet completed.</CardDescription>
+              <CardTitle className="text-base">{t("upcomingDeliveries")}</CardTitle>
+              <CardDescription>{t("upcomingDeliveriesDesc")}</CardDescription>
             </div>
             <Button asChild variant="ghost" size="sm">
-              <Link href="/production">View all<ArrowRight className="h-3 w-3" /></Link>
+              <Link href="/production">{tDashboardViewAll}<ArrowRight className="h-3 w-3" /></Link>
             </Button>
           </CardHeader>
           <CardContent className="p-0">
             {data.upcomingDeliveries.length === 0 ? (
               <div className="flex flex-col items-center py-12 text-sm text-muted-foreground">
                 <CheckCircle2 className="mb-2 h-6 w-6" />
-                Nothing due soon.
+                {t("nothingDue")}
               </div>
             ) : (
               <Table>
@@ -222,7 +232,7 @@ export default async function DashboardPage() {
                             {formatDate(it.deliveryDate)}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            in {it.daysUntil} day{it.daysUntil === 1 ? "" : "s"}
+                            {t("inDays", { days: it.daysUntil })}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -239,17 +249,17 @@ export default async function DashboardPage() {
       {!isEmpty && (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Jump to</CardTitle>
+            <CardTitle className="text-base">{t("jumpTo")}</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {canUpload && (
-              <QuickLink href="/purchase-orders/upload" icon={Upload} title="Upload PO" description="Add new orders" />
+              <QuickLink href="/purchase-orders/upload" icon={Upload} title={t("uploadPO")} description={t("addOrders")} />
             )}
             {canAllocate && (
-              <QuickLink href="/containers" icon={ContainerIcon} title="Containers" description="Allocate & seal" />
+              <QuickLink href="/containers" icon={ContainerIcon} title={t("containers")} description={t("allocateSeal")} />
             )}
-            <QuickLink href="/vessels" icon={Ship} title="Vessels" description="Schedule shipments" />
-            <QuickLink href="/packing-lists" icon={FileText} title="Packing lists" description="Download PDFs" />
+            <QuickLink href="/vessels" icon={Ship} title={t("vessels")} description={t("scheduleShipments")} />
+            <QuickLink href="/packing-lists" icon={FileText} title={t("packingLists")} description={t("downloadPDFs")} />
           </CardContent>
         </Card>
       )}
@@ -257,11 +267,11 @@ export default async function DashboardPage() {
   );
 }
 
-function getGreeting(): string {
+function getGreetingKey(): "greetingMorning" | "greetingAfternoon" | "greetingEvening" {
   const h = new Date().getHours();
-  if (h < 12) return "Good morning";
-  if (h < 18) return "Good afternoon";
-  return "Good evening";
+  if (h < 12) return "greetingMorning";
+  if (h < 18) return "greetingAfternoon";
+  return "greetingEvening";
 }
 
 function KPICard({

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { Loader2, Boxes } from "lucide-react";
 import {
@@ -23,6 +24,8 @@ interface Props {
 
 export function CBMUpdateDialog({ item, open, onOpenChange, allowMarkCompleted = true }: Props) {
   const router = useRouter();
+  const t = useTranslations("production");
+  const tCommon = useTranslations("common");
   const [cbm, setCbm] = useState(String(item.cbm || ""));
   const [packageCount, setPackageCount] = useState(String(item.packageCount || ""));
   const [grossWeight, setGrossWeight] = useState(item.grossWeight != null ? String(item.grossWeight) : "");
@@ -33,33 +36,33 @@ export function CBMUpdateDialog({ item, open, onOpenChange, allowMarkCompleted =
 
   // Vocabulary cues by category
   const packageLabel =
-    item.category === "Fabric" ? "Number of rolls" :
-    item.category === "Trims" || item.category === "Packaging" ? "Number of boxes" :
-    "Package count";
+    item.category === "Fabric" ? t("packagesRolls") :
+    item.category === "Trims" || item.category === "Packaging" ? t("packagesBoxes") :
+    t("packagesGeneric");
 
   function submit() {
     const cbmNum = Number(cbm);
     const pkgNum = Number(packageCount);
     if (!Number.isFinite(cbmNum) || cbmNum < 0) {
-      toast.error("CBM must be a number ≥ 0.");
+      toast.error(t("cbmMustBeNonNegative"));
       return;
     }
     if (!Number.isInteger(pkgNum) || pkgNum < 0) {
-      toast.error("Package count must be a whole number ≥ 0.");
+      toast.error(t("packageCountMustBeWholeNonNegative"));
       return;
     }
     const gw = grossWeight ? Number(grossWeight) : undefined;
     const nw = netWeight ? Number(netWeight) : undefined;
     if (gw !== undefined && !Number.isFinite(gw)) {
-      toast.error("Gross weight must be a number.");
+      toast.error(t("grossMustBeNumber"));
       return;
     }
     if (nw !== undefined && !Number.isFinite(nw)) {
-      toast.error("Net weight must be a number.");
+      toast.error(t("netMustBeNumber"));
       return;
     }
     if (gw !== undefined && nw !== undefined && nw > gw) {
-      toast.error("Net weight cannot exceed gross weight.");
+      toast.error(t("netCannotExceedGross"));
       return;
     }
 
@@ -74,11 +77,11 @@ export function CBMUpdateDialog({ item, open, onOpenChange, allowMarkCompleted =
           supplierRemarks: remarks.trim() || undefined,
           markCompleted,
         });
-        toast.success(markCompleted ? "Saved and marked completed." : "CBM updated.");
+        toast.success(markCompleted ? t("savedMarkedCompleted") : t("cbmUpdated"));
         onOpenChange(false);
         router.refresh();
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Update failed.");
+        toast.error(err instanceof Error ? err.message : t("updateFailed"));
       }
     });
   }
@@ -88,7 +91,7 @@ export function CBMUpdateDialog({ item, open, onOpenChange, allowMarkCompleted =
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Boxes className="h-5 w-5" /> Update CBM &amp; packaging
+            <Boxes className="h-5 w-5" /> {t("cbmDialogTitle")}
           </DialogTitle>
           <DialogDescription>
             {item.style} — {item.color} ({item.size}) · {item.quantity} {item.unit}
@@ -98,7 +101,7 @@ export function CBMUpdateDialog({ item, open, onOpenChange, allowMarkCompleted =
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="cbm">CBM *</Label>
+              <Label htmlFor="cbm">{t("cbmField")} *</Label>
               <Input
                 id="cbm"
                 type="number"
@@ -126,7 +129,7 @@ export function CBMUpdateDialog({ item, open, onOpenChange, allowMarkCompleted =
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="gross">Gross weight (kg)</Label>
+              <Label htmlFor="gross">{t("grossWeight")}</Label>
               <Input
                 id="gross"
                 type="number"
@@ -139,7 +142,7 @@ export function CBMUpdateDialog({ item, open, onOpenChange, allowMarkCompleted =
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="net">Net weight (kg)</Label>
+              <Label htmlFor="net">{t("netWeight")}</Label>
               <Input
                 id="net"
                 type="number"
@@ -154,13 +157,13 @@ export function CBMUpdateDialog({ item, open, onOpenChange, allowMarkCompleted =
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="sup-remarks">Remarks</Label>
+            <Label htmlFor="sup-remarks">{t("supplierRemarks")}</Label>
             <Input
               id="sup-remarks"
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
               disabled={saving}
-              placeholder="Optional notes for the merchant..."
+              placeholder={t("supplierRemarksPlaceholder")}
             />
           </div>
 
@@ -173,22 +176,22 @@ export function CBMUpdateDialog({ item, open, onOpenChange, allowMarkCompleted =
                 disabled={saving}
                 className="h-4 w-4"
               />
-              <span>Also mark this item as <strong>Completed</strong></span>
+              <span>{t("alsoMarkCompleted")}</span>
             </label>
           )}
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancel
+            {tCommon("cancel")}
           </Button>
           <Button onClick={submit} disabled={saving || !cbm || !packageCount}>
             {saving ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Saving...
+                <Loader2 className="h-4 w-4 animate-spin" /> {t("saving")}
               </>
             ) : (
-              "Save"
+              tCommon("save")
             )}
           </Button>
         </DialogFooter>

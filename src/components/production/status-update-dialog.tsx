@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import {
@@ -29,13 +30,16 @@ export function StatusUpdateDialog({
   itemId, itemLabel, currentStatus, allowedStatuses, open, onOpenChange,
 }: Props) {
   const router = useRouter();
+  const t = useTranslations("production");
+  const tStatus = useTranslations("status");
+  const tCommon = useTranslations("common");
   const [status, setStatus] = useState<POItemStatus>(currentStatus);
   const [remarks, setRemarks] = useState("");
   const [saving, startSave] = useTransition();
 
   function submit() {
     if (status === currentStatus && !remarks.trim()) {
-      toast.info("No changes to save.");
+      toast.info(t("noChangesToSave"));
       onOpenChange(false);
       return;
     }
@@ -46,11 +50,11 @@ export function StatusUpdateDialog({
           status,
           supplierRemarks: remarks.trim() || undefined,
         });
-        toast.success(`Status updated to "${status}".`);
+        toast.success(t("statusUpdated", { status: tStatus(status) }));
         onOpenChange(false);
         router.refresh();
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Update failed.");
+        toast.error(err instanceof Error ? err.message : t("updateFailed"));
       }
     });
   }
@@ -59,48 +63,48 @@ export function StatusUpdateDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Update status</DialogTitle>
+          <DialogTitle>{t("statusDialogTitle")}</DialogTitle>
           <DialogDescription>{itemLabel}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>New status</Label>
+            <Label>{t("newStatus")}</Label>
             <Select value={status} onValueChange={(v) => setStatus(v as POItemStatus)} disabled={saving}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {allowedStatuses.map((s) => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                  <SelectItem key={s} value={s}>{tStatus(s)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="remarks">Remarks (optional)</Label>
+            <Label htmlFor="remarks">{t("remarksOptional")}</Label>
             <Input
               id="remarks"
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
               disabled={saving}
-              placeholder="Notes about this status change..."
+              placeholder={t("remarksPlaceholder")}
             />
           </div>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancel
+            {tCommon("cancel")}
           </Button>
           <Button onClick={submit} disabled={saving}>
             {saving ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Saving...
+                <Loader2 className="h-4 w-4 animate-spin" /> {t("saving")}
               </>
             ) : (
-              "Update"
+              t("update")
             )}
           </Button>
         </DialogFooter>

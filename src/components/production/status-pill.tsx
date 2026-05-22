@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslations } from "next-intl";
 import { Clock, Play, Loader2, CheckCircle2, Package, Ship } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { POItemStatus } from "@/types";
@@ -12,11 +15,12 @@ const CONFIG: Record<POItemStatus, { variant: "secondary" | "info" | "warning" |
 };
 
 export function StatusPill({ status }: { status: POItemStatus }) {
+  const t = useTranslations("status");
   const { variant, icon: Icon } = CONFIG[status];
   return (
     <Badge variant={variant} className="gap-1">
       <Icon className={`h-3 w-3 ${status === "In Progress" ? "animate-spin" : ""}`} />
-      {status}
+      {t(status)}
     </Badge>
   );
 }

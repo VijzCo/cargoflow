@@ -13,7 +13,3 @@ dist
 firebase-debug.log
 .firebase
 coverage
-
-.env*
-.firebase
-

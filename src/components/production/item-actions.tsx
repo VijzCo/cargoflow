@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Pencil, Boxes, MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +26,7 @@ export function ItemActions({
   canUpdateCBM: boolean;
   isSupplier: boolean;
 }) {
+  const t = useTranslations("production");
   const [statusOpen, setStatusOpen] = useState(false);
   const [cbmOpen, setCbmOpen] = useState(false);
 
@@ -40,18 +42,18 @@ export function ItemActions({
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon" className="h-8 w-8">
             <MoreVertical className="h-4 w-4" />
-            <span className="sr-only">Actions</span>
+            
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           {canUpdateStatus && (
             <DropdownMenuItem onClick={() => setStatusOpen(true)}>
-              <Pencil className="mr-2 h-3.5 w-3.5" /> Update status
+              <Pencil className="mr-2 h-3.5 w-3.5" /> {t("updateStatus")}
             </DropdownMenuItem>
           )}
           {canUpdateCBM && (
             <DropdownMenuItem onClick={() => setCbmOpen(true)}>
-              <Boxes className="mr-2 h-3.5 w-3.5" /> Update CBM &amp; packages
+              <Boxes className="mr-2 h-3.5 w-3.5" /> {t("updateCBM")}
             </DropdownMenuItem>
           )}
         </DropdownMenuContent>

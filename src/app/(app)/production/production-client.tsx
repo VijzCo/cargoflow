@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import {
   collection, query, where, onSnapshot, orderBy, limit,
   type QueryConstraint,
@@ -139,34 +140,32 @@ export function ProductionClient({
 
   const canUpdateStatus = hasPermission(role, "po_items.update_status") || isSupplier;
   const canUpdateCBM = hasPermission(role, "po_items.update_cbm");
+  const t = useTranslations("production");
+  const tStatus = useTranslations("status");
 
   // ---- Render ----
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Production</h1>
+        <h1 className="text-2xl font-bold tracking-tight md:text-3xl">{t("title")}</h1>
         <p className="mt-1 text-muted-foreground">
-          {isSupplier
-            ? "Items assigned to you. Update production status and CBM as you go."
-            : "Live view of production progress across all suppliers."}
+          {isSupplier ? t("subtitleSupplier") : t("subtitleAdmin")}
         </p>
       </div>
 
       <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5">
-        <KPI label="Total items" value={kpi.total} icon={Factory} />
-        <KPI label="Pending" value={kpi.pending} icon={Clock} accent="amber" />
-        <KPI label="In progress" value={kpi.inProgress} icon={Factory} accent="indigo" />
-        <KPI label="Completed" value={kpi.completed} icon={CheckCircle2} accent="emerald" />
-        <KPI label="Overdue" value={kpi.overdue} icon={AlertTriangle} accent="rose" />
+        <KPI label={t("kpiTotal")} value={kpi.total} icon={Factory} />
+        <KPI label={t("kpiPending")} value={kpi.pending} icon={Clock} accent="amber" />
+        <KPI label={t("kpiInProgress")} value={kpi.inProgress} icon={Factory} accent="indigo" />
+        <KPI label={t("kpiCompleted")} value={kpi.completed} icon={CheckCircle2} accent="emerald" />
+        <KPI label={t("kpiOverdue")} value={kpi.overdue} icon={AlertTriangle} accent="rose" />
       </div>
 
       {kpi.noCbm > 0 && !isSupplier && (
         <Card>
           <CardContent className="flex items-center gap-2 p-3 text-sm">
             <AlertTriangle className="h-4 w-4 text-amber-500" />
-            <span>
-              <strong>{kpi.noCbm}</strong> item{kpi.noCbm === 1 ? "" : "s"} are in production but still have no CBM declared.
-            </span>
+            <span>{t("noCBMWarning", { count: kpi.noCbm })}</span>
           </CardContent>
         </Card>
       )}
@@ -177,7 +176,7 @@ export function ProductionClient({
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search style, color, PO..."
+                placeholder={t("searchPlaceholder")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9"
@@ -186,9 +185,9 @@ export function ProductionClient({
 
             {!isSupplier && (
               <Select value={supplierFilter} onValueChange={setSupplierFilter}>
-                <SelectTrigger><SelectValue placeholder="All suppliers" /></SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ALL}>All suppliers</SelectItem>
+                  <SelectItem value={ALL}>{t("allStatuses")}</SelectItem>
                   {suppliers.map((s) => (
                     <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                   ))}
@@ -197,10 +196,10 @@ export function ProductionClient({
             )}
 
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger><SelectValue placeholder="All statuses" /></SelectTrigger>
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value={ALL}>All statuses</SelectItem>
-                {STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                <SelectItem value={ALL}>{t("allStatuses")}</SelectItem>
+                {STATUSES.map((s) => <SelectItem key={s} value={s}>{tStatus(s)}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -211,27 +210,25 @@ export function ProductionClient({
         <CardContent className="p-0">
           {loading ? (
             <div className="flex items-center gap-2 p-8 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" /> Loading items...
+              <Loader2 className="h-4 w-4 animate-spin" /> {t("loading")}
             </div>
           ) : filtered.length === 0 ? (
             <div className="p-12 text-center text-sm text-muted-foreground">
-              {items.length === 0
-                ? "No items assigned yet."
-                : "No items match your filters."}
+              {items.length === 0 ? t("noItemsAssigned") : t("title")}
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>PO</TableHead>
-                  {!isSupplier && <TableHead>Supplier</TableHead>}
-                  <TableHead>Style</TableHead>
-                  <TableHead>Color</TableHead>
-                  <TableHead>Size</TableHead>
-                  <TableHead className="text-right">Qty</TableHead>
-                  <TableHead className="text-right">CBM</TableHead>
-                  <TableHead>Delivery</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>{t("colPO")}</TableHead>
+                  {!isSupplier && <TableHead>{t("colSupplier")}</TableHead>}
+                  <TableHead>{t("colStyle")}</TableHead>
+                  <TableHead>{t("colColor")}</TableHead>
+                  <TableHead>{t("colSize")}</TableHead>
+                  <TableHead className="text-right">{t("colQty")}</TableHead>
+                  <TableHead className="text-right">{t("colCBM")}</TableHead>
+                  <TableHead>{t("colDelivery")}</TableHead>
+                  <TableHead>{t("colStatus")}</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
@@ -263,7 +260,7 @@ export function ProductionClient({
                       <TableCell>
                         <span className={`text-xs ${overdue ? "font-medium text-rose-600 dark:text-rose-400" : ""}`}>
                           {formatDate(item.deliveryDate)}
-                          {overdue && <Badge variant="destructive" className="ml-1">Overdue</Badge>}
+                          {overdue && <Badge variant="destructive" className="ml-1">{t("overdue")}</Badge>}
                         </span>
                       </TableCell>
                       <TableCell><StatusPill status={item.status} /></TableCell>
