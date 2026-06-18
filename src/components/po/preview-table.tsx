@@ -105,6 +105,10 @@ export function PreviewTable({
 
   // ---- Derived state ----
   const activeRows = useMemo(() => rows.filter((r) => !r.deleted), [rows]);
+  const hasAnyFabricColumn = useMemo(
+    () => activeRows.some((r) => r.category === "Fabric" || r.composition || r.reference || r.shade),
+    [activeRows],
+  );
 
   const errorList = useMemo(() => {
     const errs: { row: number; field: string; message: string }[] = [...parseResult.errors];
@@ -167,6 +171,10 @@ export function PreviewTable({
           deliveryDate: r.deliveryDate,
           salesChannel: r.salesChannel,
           remarks: r.remarks,
+          // Forward fabric fields verbatim — savePO sets initial lock flags.
+          composition: r.composition,
+          reference: r.reference,
+          shade: r.shade,
           uniqueKey: r.uniqueKey,
         }));
 
@@ -268,9 +276,12 @@ export function PreviewTable({
                 <TableHead className="text-right">Qty</TableHead>
                 <TableHead>Unit</TableHead>
                 <TableHead>Category</TableHead>
+                {hasAnyFabricColumn && <TableHead>Fabric</TableHead>}
                 <TableHead>Delivery</TableHead>
                 <TableHead>Channel</TableHead>
                 <TableHead></TableHead>
+              </TableRow>
+            </TableHeader>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -388,6 +399,51 @@ export function PreviewTable({
                         </SelectContent>
                       </Select>
                     </TableCell>
+                    {hasAnyFabricColumn && (
+                      <TableCell className="max-w-[200px] text-xs">
+                        {r.category === "Fabric" ? (
+                          isEditing ? (
+                            <div className="space-y-1">
+                              <Input
+                                value={r.composition ?? ""}
+                                onChange={(e) => updateRow(r.rowId, { composition: e.target.value || undefined })}
+                                placeholder="Composition"
+                                className="h-7 text-xs"
+                              />
+                              <Input
+                                value={r.reference ?? ""}
+                                onChange={(e) => updateRow(r.rowId, { reference: e.target.value || undefined })}
+                                placeholder="Reference"
+                                className="h-7 text-xs"
+                              />
+                              <Input
+                                value={r.shade ?? ""}
+                                onChange={(e) => updateRow(r.rowId, { shade: e.target.value || undefined })}
+                                placeholder="Approved shade"
+                                className="h-7 text-xs"
+                              />
+                            </div>
+                          ) : (
+                            <div className="space-y-0.5 leading-tight">
+                              {r.composition && (
+                                <div className="truncate"><span className="text-muted-foreground">Comp:</span> {r.composition}</div>
+                              )}
+                              {r.reference && (
+                                <div className="truncate"><span className="text-muted-foreground">Ref:</span> {r.reference}</div>
+                              )}
+                              {r.shade && (
+                                <div className="truncate"><span className="text-muted-foreground">Shade:</span> {r.shade}</div>
+                              )}
+                              {!r.composition && !r.reference && !r.shade && (
+                                <span className="italic text-muted-foreground">not set</span>
+                              )}
+                            </div>
+                          )
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                    )}
                     <TableCell>
                       {isEditing ? (
                         <Input

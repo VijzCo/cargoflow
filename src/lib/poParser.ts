@@ -40,6 +40,11 @@ export interface POItem {
   deliveryDate?: string;        // ISO yyyy-mm-dd
   salesChannel?: string;
   remarks?: string;
+  // Optional fabric details (only meaningful for Fabric items, but the parser
+  // populates them whenever the columns are present, regardless of category).
+  composition?: string;
+  reference?: string;
+  shade?: string;
   uniqueKey: string;            // poNumbers[0] + style + color + size, uppercased
   rawRowIndex: number;
 }
@@ -217,6 +222,12 @@ const TEMPLATE_HEADERS = [
   "Supplier", "PO Number", "Order No", "Style", "Color", "Size",
   "Quantity", "Unit", "Unit Price", "Category", "Description",
   "Delivery Date", "Sales Channel", "Remarks",
+  // Optional fabric columns — header detection still triggers on the original 14
+  // (we only need 6 hits to identify a template), so these are additive and
+  // backwards-compatible with older sheets that don't have them.
+  "Composition", "Fabric Composition",
+  "Reference", "Ref", "Fabric Reference",
+  "Shade", "Approved Shade",
 ];
 
 function isTemplateSheet(rows: unknown[][]): boolean {
@@ -226,6 +237,15 @@ function isTemplateSheet(rows: unknown[][]): boolean {
     if (hits >= 6) return true;
   }
   return false;
+}
+
+// Return the column index for the first matching alias (or -1).
+function findCol(headers: string[], ...aliases: string[]): number {
+  for (const a of aliases) {
+    const i = headers.indexOf(a);
+    if (i !== -1) return i;
+  }
+  return -1;
 }
 
 function parseTemplate(rows: unknown[][]): ParseResult {
@@ -251,6 +271,9 @@ function parseTemplate(rows: unknown[][]): ParseResult {
     qty: idx("Quantity"), unit: idx("Unit"), price: idx("Unit Price"),
     cat: idx("Category"), desc: idx("Description"),
     date: idx("Delivery Date"), channel: idx("Sales Channel"), remarks: idx("Remarks"),
+    composition: findCol(headers, "Composition", "Fabric Composition"),
+    reference:   findCol(headers, "Reference", "Ref", "Fabric Reference"),
+    shade:       findCol(headers, "Shade", "Approved Shade"),
   };
 
   const seen = new Map<string, number>();
@@ -308,6 +331,9 @@ function parseTemplate(rows: unknown[][]): ParseResult {
       deliveryDate,
       salesChannel: String(cell(cols.channel) ?? "").trim() || undefined,
       remarks: String(cell(cols.remarks) ?? "").trim() || undefined,
+      composition: String(cell(cols.composition) ?? "").trim() || undefined,
+      reference:   String(cell(cols.reference) ?? "").trim() || undefined,
+      shade:       String(cell(cols.shade) ?? "").trim() || undefined,
       uniqueKey: makeUniqueKey(poNumbers, style, color, size),
       rawRowIndex: rowNum,
     };

@@ -26,8 +26,12 @@ export function CreateContainerDialog({
   function submit() {
     startSave(async () => {
       try {
-        await createContainer({ containerNumber: number.trim(), type });
-        toast.success(`Container ${number} created.`);
+        const trimmed = number.trim();
+        const res = await createContainer({
+          containerNumber: trimmed.length > 0 ? trimmed : undefined,
+          type,
+        });
+        toast.success(`Container ${res.carrierNumber || res.containerNumber} created.`);
         setNumber("");
         onOpenChange(false);
         router.refresh();
@@ -45,23 +49,26 @@ export function CreateContainerDialog({
             <ContainerIcon className="h-5 w-5" /> Add container
           </DialogTitle>
           <DialogDescription>
-            Register a physical container so items can be loaded into it.
+            Register a container so items can be loaded into it. The carrier
+            container number can be added now, or later before sealing.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="cnum">Container number *</Label>
+            <Label htmlFor="cnum">Carrier container number (optional)</Label>
             <Input
               id="cnum"
               value={number}
               onChange={(e) => setNumber(e.target.value.toUpperCase())}
               disabled={saving}
-              placeholder="e.g. MSCU1234567"
+              placeholder="e.g. MSCU1234567 (leave blank if not yet known)"
               maxLength={40}
             />
             <p className="text-xs text-muted-foreground">
-              The physical container ID from the carrier.
+              The physical container ID from the carrier. If you don&apos;t have it yet,
+              CargoFlow assigns a temporary system ID (CTR-YYYY-MM-NNN) that you can
+              replace before sealing.
             </p>
           </div>
 
@@ -82,7 +89,7 @@ export function CreateContainerDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancel</Button>
-          <Button onClick={submit} disabled={saving || !number.trim()}>
+          <Button onClick={submit} disabled={saving}>
             {saving ? <><Loader2 className="h-4 w-4 animate-spin" /> Creating...</> : "Create container"}
           </Button>
         </DialogFooter>

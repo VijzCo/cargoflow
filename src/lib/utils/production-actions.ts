@@ -46,6 +46,10 @@ function toView(doc: FirebaseFirestore.QueryDocumentSnapshot | FirebaseFirestore
     supplierRemarks: data.supplierRemarks,
     containerId: data.containerId,
     vesselId: data.vesselId,
+    composition: data.composition,
+    reference: data.reference,
+    shade: data.shade,
+    fabricLocks: data.fabricLocks,
     updatedAt: data.updatedAt?.toDate?.()?.toISOString() ?? null,
   };
 }
@@ -292,6 +296,91 @@ export async function updateItemCBM(input: z.infer<typeof CBMUpdateSchema>) {
   revalidatePath(`/purchase-orders/${item.poId}`);
   revalidatePath("/production");
   return { ok: true };
+}
+
+// =============================================================================
+// updateFabricDetails — merchant-only. Writes any of composition/reference/shade
+// that are currently empty (or unlocked) on the item. Locked fields are
+// rejected silently (preserving existing values). Once a value is written,
+// the matching lock flag is flipped to true.
+// =============================================================================
+
+const FabricDetailsSchema = z.object({
+  itemId: z.string().min(1),
+  composition: z.string().trim().optional(),
+  reference: z.string().trim().optional(),
+  shade: z.string().trim().optional(),
+});
+
+export async function updateFabricDetails(input: z.infer<typeof FabricDetailsSchema>) {
+  const user = await requireSessionUser();
+  // Per CR: merchants only (which also includes super_admin and logistics via
+  // the same purchase_orders.update permission). Suppliers + viewers are denied.
+  if (!hasPermission(user.role, "purchase_orders.update")) {
+    throw new Error("You don't have permission to edit fabric details.");
+  }
+  const data = FabricDetailsSchema.parse(input);
+
+  const ref = adminDb.collection("po_items").doc(data.itemId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error("Item not found.");
+  const item = snap.data()!;
+
+  if (item.category !== "Fabric") {
+    throw new Error("Fabric details only apply to items with category = Fabric.");
+  }
+
+  const existingLocks = item.fabricLocks ?? {};
+  const updates: Record<string, unknown> = {};
+  const newLocks = { ...existingLocks };
+  const changedFields: string[] = [];
+
+  // Only persist non-empty values for fields that are NOT already locked.
+  if (data.composition && data.composition.length > 0 && !existingLocks.composition) {
+    updates.composition = data.composition;
+    newLocks.composition = true;
+    changedFields.push("composition");
+  }
+  if (data.reference && data.reference.length > 0 && !existingLocks.reference) {
+    updates.reference = data.reference;
+    newLocks.reference = true;
+    changedFields.push("reference");
+  }
+  if (data.shade && data.shade.length > 0 && !existingLocks.shade) {
+    updates.shade = data.shade;
+    newLocks.shade = true;
+    changedFields.push("shade");
+  }
+
+  if (changedFields.length === 0) {
+    // Nothing actionable — either everything was empty or all fields were already locked.
+    return { ok: true, changed: 0 };
+  }
+
+  updates.fabricLocks = newLocks;
+  updates.updatedAt = FieldValue.serverTimestamp();
+  updates.updatedBy = user.uid;
+
+  await ref.update(updates);
+
+  await writeActivityLog({
+    userId: user.uid,
+    userEmail: user.email,
+    userRole: user.role,
+    action: "item.fabric_update",
+    targetType: "po_item",
+    targetId: data.itemId,
+    details: {
+      style: item.style,
+      color: item.color,
+      size: item.size,
+      fieldsSet: changedFields,
+    },
+  });
+
+  revalidatePath(`/purchase-orders/${item.poId}`);
+  revalidatePath("/production");
+  return { ok: true, changed: changedFields.length };
 }
 
 // =============================================================================

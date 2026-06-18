@@ -149,7 +149,14 @@
     "itemColCBM": "体积",
     "itemColPackages": "包装数",
     "itemColStatus": "状态",
-    "itemColDelivery": "交付日期"
+    "itemColDelivery": "交付日期",
+    "colFabricDetails": "面料详情",
+    "editFabric": "编辑",
+    "editFabricTitle": "编辑面料详情",
+    "editFabricDesc": "请填写下方缺失的内容。保存后,每个字段将被锁定且不可再修改。已锁定的字段仅供参考,无法更改。",
+    "editFabricNoChanges": "无变更可保存。",
+    "editFabricSaved": "面料详情已保存。已锁定,不可再编辑。",
+    "editFabricSaveBtn": "保存(将锁定数据)"
   },
   "production": {
     "title": "生产",
@@ -202,7 +209,16 @@
     "netMustBeNumber": "净重必须为数字。",
     "netCannotExceedGross": "净重不能超过毛重。",
     "savedMarkedCompleted": "已保存并标记为完成。",
-    "cbmUpdated": "体积已更新。"
+    "cbmUpdated": "体积已更新。",
+    "colFabric": "面料信息",
+    "fabricNotSet": "未填写",
+    "fabricComp": "成分",
+    "fabricRef": "编号",
+    "fabricShade": "色号",
+    "fabricReferenceTitle": "面料参考",
+    "fabricComposition": "成分",
+    "fabricReference": "面料编号",
+    "fabricApprovedShade": "批准色号"
   },
   "containers": {
     "title": "集装箱",
@@ -272,7 +288,22 @@
     "autoSkippedMore": "+ 更多(应用时将跳过这些物料,它们将保持「已完成」状态)",
     "autoNewContainersHeader": "将创建的新集装箱",
     "autoApply": "应用 ({count} 件)",
-    "autoApplying": "应用中..."
+    "autoApplying": "应用中...",
+    "carrierNumber": "承运商集装箱编号",
+    "setCarrier": "设置承运商编号",
+    "editCarrier": "编辑承运商编号",
+    "setCarrierTitle": "设置承运商集装箱编号",
+    "editCarrierTitle": "编辑承运商集装箱编号",
+    "carrierDescription": "承运商提供的集装箱编号(如 MSCU1234567)。设置后将作为各处的显示名称使用。内部系统编号保持不变。集装箱封箱后无法再修改。",
+    "carrierLabel": "承运商集装箱编号",
+    "carrierHint": "必须唯一,通常仅包含字母和数字。",
+    "carrierMissing": "尚未设置承运商集装箱编号 — 请在封箱前设置。",
+    "systemId": "系统编号",
+    "carrierSavedToast": "承运商编号已设置。",
+    "carrierRenameFailed": "重命名失败。",
+    "createOptionalCarrier": "承运商集装箱编号(可选)",
+    "createCarrierPlaceholder": "如 MSCU1234567(如未知请留空)",
+    "createOptionalHint": "承运商提供的实体集装箱编号。如暂未获得,CargoFlow 会自动分配临时系统编号(CTR-YYYY-MM-NNN),封箱前可替换。"
   },
   "vessels": {
     "title": "船舶",

@@ -5,13 +5,14 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
-  Container as ContainerIcon, Plus, Lock, Loader2, Ship, AlertTriangle, Trash2,
+  Container as ContainerIcon, Plus, Lock, Loader2, Ship, AlertTriangle, Trash2, Pencil,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ManualAllocateDialog } from "@/components/containers/manual-allocate-dialog";
+import { RenameCarrierDialog } from "@/components/containers/rename-carrier-dialog";
 import { sealContainer, removeFromContainer, type ContainerView, type AllocatableItem } from "@/lib/utils/container-actions";
 import { formatNumber, formatDate, formatCBM, cn } from "@/lib/utils/format";
 
@@ -28,10 +29,13 @@ export function ContainerDetailClient({
 }) {
   const router = useRouter();
   const [allocateOpen, setAllocateOpen] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
   const [working, startTransition] = useTransition();
 
   const container = initialContainer;
   const items = initialItems;
+  const hasCarrier = !!container.carrierNumber;
+  const displayName = container.displayNumber;
 
   const pct = Math.min(100, Math.round(container.utilization * 100));
   const remaining = Math.max(0, container.usableCbm - container.loadedCbm);
@@ -50,11 +54,11 @@ export function ContainerDetailClient({
   const canSealNow = container.status === "Open" && canSeal && items.length > 0;
 
   function handleSeal() {
-    if (!confirm(`Seal container ${container.containerNumber}? You won't be able to add or remove items after this.`)) return;
+    if (!confirm(`Seal container ${displayName}? You won't be able to add or remove items after this.`)) return;
     startTransition(async () => {
       try {
         await sealContainer(container.id);
-        toast.success(`Container ${container.containerNumber} sealed.`);
+        toast.success(`Container ${displayName} sealed.`);
         router.refresh();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Seal failed.");
@@ -79,12 +83,22 @@ export function ContainerDetailClient({
     <div className="space-y-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <ContainerIcon className="h-6 w-6 text-muted-foreground" />
-            <h1 className="font-mono text-2xl font-bold tracking-tight md:text-3xl">{container.containerNumber}</h1>
+            <h1 className="font-mono text-2xl font-bold tracking-tight md:text-3xl">{displayName}</h1>
             <Badge variant="outline">{container.type}</Badge>
             <Badge variant={statusVariant}>{container.status}</Badge>
           </div>
+          {hasCarrier && container.containerNumber !== container.carrierNumber && (
+            <p className="mt-1 font-mono text-xs text-muted-foreground">
+              System ID: {container.containerNumber}
+            </p>
+          )}
+          {!hasCarrier && (
+            <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+              No carrier container number yet — set it before sealing.
+            </p>
+          )}
           <p className="mt-1 text-muted-foreground">
             {items.length} item{items.length === 1 ? "" : "s"} from {container.supplierIds.length} supplier{container.supplierIds.length === 1 ? "" : "s"}
             {container.vesselId && <> · attached to a vessel</>}
@@ -92,6 +106,11 @@ export function ContainerDetailClient({
         </div>
 
         <div className="flex flex-wrap gap-2">
+          {container.status === "Open" && canAssign && (
+            <Button variant="outline" onClick={() => setRenameOpen(true)} disabled={working}>
+              <Pencil className="h-4 w-4" /> {hasCarrier ? "Edit carrier #" : "Set carrier #"}
+            </Button>
+          )}
           {canAddItems && (
             <Button onClick={() => setAllocateOpen(true)} disabled={working}>
               <Plus className="h-4 w-4" /> Assign items
@@ -212,11 +231,19 @@ export function ContainerDetailClient({
 
       <ManualAllocateDialog
         containerId={container.id}
-        containerNumber={container.containerNumber}
+        containerNumber={displayName}
         usableCbm={container.usableCbm}
         loadedCbm={container.loadedCbm}
         open={allocateOpen}
         onOpenChange={setAllocateOpen}
+      />
+
+      <RenameCarrierDialog
+        containerId={container.id}
+        currentCarrierNumber={container.carrierNumber}
+        systemNumber={container.containerNumber}
+        open={renameOpen}
+        onOpenChange={setRenameOpen}
       />
     </div>
   );

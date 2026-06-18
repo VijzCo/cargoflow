@@ -149,7 +149,14 @@
     "itemColCBM": "CBM",
     "itemColPackages": "Packages",
     "itemColStatus": "Status",
-    "itemColDelivery": "Delivery"
+    "itemColDelivery": "Delivery",
+    "colFabricDetails": "Fabric details",
+    "editFabric": "Edit",
+    "editFabricTitle": "Edit fabric details",
+    "editFabricDesc": "Fill in any missing values below. Once saved, each field is locked and can't be edited again. Already-locked fields are shown for reference but can't be changed.",
+    "editFabricNoChanges": "No changes to save.",
+    "editFabricSaved": "Fabric details saved. Locked from further edits.",
+    "editFabricSaveBtn": "Save (locks values)"
   },
   "production": {
     "title": "Production",
@@ -202,7 +209,16 @@
     "netMustBeNumber": "Net weight must be a number.",
     "netCannotExceedGross": "Net weight cannot exceed gross weight.",
     "savedMarkedCompleted": "Saved and marked completed.",
-    "cbmUpdated": "CBM updated."
+    "cbmUpdated": "CBM updated.",
+    "colFabric": "Fabric",
+    "fabricNotSet": "not set",
+    "fabricComp": "Comp",
+    "fabricRef": "Ref",
+    "fabricShade": "Shade",
+    "fabricReferenceTitle": "Fabric reference",
+    "fabricComposition": "Composition",
+    "fabricReference": "Reference",
+    "fabricApprovedShade": "Approved shade"
   },
   "containers": {
     "title": "Containers",
@@ -272,7 +288,22 @@
     "autoSkippedMore": "+ more (apply will skip these; they stay Completed)",
     "autoNewContainersHeader": "New containers to create",
     "autoApply": "Apply ({count} items)",
-    "autoApplying": "Applying..."
+    "autoApplying": "Applying...",
+    "carrierNumber": "Carrier container number",
+    "setCarrier": "Set carrier #",
+    "editCarrier": "Edit carrier #",
+    "setCarrierTitle": "Set carrier container number",
+    "editCarrierTitle": "Edit carrier container number",
+    "carrierDescription": "The carrier-issued container ID (e.g. MSCU1234567). This becomes the display name everywhere. The internal system ID stays the same. Once the container is sealed, this can no longer be changed.",
+    "carrierLabel": "Carrier container number",
+    "carrierHint": "Must be unique. Letters and numbers only is typical.",
+    "carrierMissing": "No carrier container number yet — set it before sealing.",
+    "systemId": "System ID",
+    "carrierSavedToast": "Carrier number set.",
+    "carrierRenameFailed": "Rename failed.",
+    "createOptionalCarrier": "Carrier container number (optional)",
+    "createCarrierPlaceholder": "e.g. MSCU1234567 (leave blank if not yet known)",
+    "createOptionalHint": "The physical container ID from the carrier. If you don't have it yet, CargoFlow assigns a temporary system ID (CTR-YYYY-MM-NNN) that you can replace before sealing."
   },
   "vessels": {
     "title": "Vessels",

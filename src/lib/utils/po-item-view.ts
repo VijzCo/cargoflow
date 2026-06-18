@@ -31,5 +31,16 @@ export type POItemView = {
   supplierRemarks?: string;
   containerId?: string;
   vesselId?: string;
+  // Fabric-only fields. Lock flags indicate the field has been set and is
+  // now read-only. Undefined locks (and empty values) mean the field is
+  // still editable by a merchant.
+  composition?: string;
+  reference?: string;
+  shade?: string;
+  fabricLocks?: {
+    composition?: boolean;
+    reference?: boolean;
+    shade?: boolean;
+  };
   updatedAt: string | null;
 };

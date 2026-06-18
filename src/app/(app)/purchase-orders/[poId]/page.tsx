@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDate, formatNumber, formatCBM } from "@/lib/utils/format";
 import { ItemActions } from "@/components/production/item-actions";
+import { FabricDetailsCell } from "@/components/po/fabric-details-cell";
 
 export default async function PODetailPage({ params }: { params: { poId: string } }) {
   const user = await getSessionUser();
@@ -27,6 +28,7 @@ export default async function PODetailPage({ params }: { params: { poId: string 
   const isSupplier = user.role === "supplier";
   const canUpdateCBM = hasPermission(user.role, "po_items.update_cbm");
   const canUpdateStatus = hasPermission(user.role, "po_items.update_status") || isSupplier;
+  const canEditFabric = hasPermission(user.role, "purchase_orders.update");
 
   // Sort items: by category then style then color then size
   const sortedItems = [...items].sort((a, b) =>
@@ -35,6 +37,8 @@ export default async function PODetailPage({ params }: { params: { poId: string 
     a.color.localeCompare(b.color) ||
     a.size.localeCompare(b.size),
   );
+
+  const hasAnyFabric = sortedItems.some((i) => i.category === "Fabric");
 
   return (
     <div className="space-y-6">
@@ -80,6 +84,7 @@ export default async function PODetailPage({ params }: { params: { poId: string 
                 <TableHead>Size</TableHead>
                 <TableHead className="text-right">Qty</TableHead>
                 <TableHead>Unit</TableHead>
+                {hasAnyFabric && <TableHead>Fabric details</TableHead>}
                 <TableHead className="text-right">CBM</TableHead>
                 <TableHead className="text-right">Packages</TableHead>
                 <TableHead>Status</TableHead>
@@ -95,6 +100,22 @@ export default async function PODetailPage({ params }: { params: { poId: string 
                   <TableCell className="text-sm">{item.size}</TableCell>
                   <TableCell className="text-right font-mono text-sm">{formatNumber(item.quantity)}</TableCell>
                   <TableCell className="text-xs">{item.unit}</TableCell>
+                  {hasAnyFabric && (
+                    <TableCell className="max-w-[260px] text-xs">
+                      {item.category === "Fabric" ? (
+                        <FabricDetailsCell
+                          itemId={item.id}
+                          composition={item.composition}
+                          reference={item.reference}
+                          shade={item.shade}
+                          locks={item.fabricLocks}
+                          canEdit={canEditFabric}
+                        />
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                  )}
                   <TableCell className="text-right font-mono text-sm">{item.cbm.toFixed(2)}</TableCell>
                   <TableCell className="text-right font-mono text-sm">{item.packageCount || "—"}</TableCell>
                   <TableCell>

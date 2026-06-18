@@ -111,6 +111,21 @@ export interface POItemDoc {
   remarks?: string;
   uniqueKey: string;              // PO|STYLE|COLOR|SIZE, uppercased
 
+  // Fabric-only details (only meaningful when category === "Fabric").
+  // Once a non-empty value is set (via upload or merchant edit), it is locked.
+  composition?: string;
+  reference?: string;
+  shade?: string;
+  // Locked flag per field — once true, the field is read-only forever.
+  // We DON'T re-derive lock state from "is value present" because we want
+  // upload-from-Excel-with-value behavior (locked) to be the same as
+  // "merchant set this via dialog" (locked).
+  fabricLocks?: {
+    composition?: boolean;
+    reference?: boolean;
+    shade?: boolean;
+  };
+
   // Supplier-updatable fields
   status: POItemStatus;
   cbm: number;                    // CBM declared by supplier
@@ -142,7 +157,11 @@ export const CONTAINER_CAPACITY: Record<ContainerType, number> = {
 
 export interface ContainerDoc {
   id: string;
-  containerNumber: string;        // physical container # e.g. MSCU1234567
+  containerNumber: string;        // System identifier — used in URLs, audit logs, and as a fallback display name.
+                                  // Auto-generated when not supplied at creation (e.g. CTR-2026-04-001).
+  carrierNumber?: string;         // The real physical carrier-issued ID (e.g. MSCU1234567).
+                                  // Editable while status === "Open", locked once sealed.
+                                  // Displayed everywhere if set; falls back to containerNumber when empty.
   type: ContainerType;
   capacityCbm: number;            // nominal capacity
   usableCbm: number;              // capacityCbm * settings.usablePercent
@@ -255,10 +274,11 @@ export type ActivityAction =
   | "user.create" | "user.update" | "user.deactivate" | "user.activate"
   | "po.upload" | "po.update" | "po.delete"
   | "item.status_change" | "item.cbm_update"
-  | "container.create" | "container.assign" | "container.seal"
+  | "container.create" | "container.assign" | "container.seal" | "container.rename"
   | "vessel.create" | "vessel.dispatch"
   | "packing_list.generate"
-  | "settings.update";
+  | "settings.update"
+  | "item.fabric_update";
 
 export interface ActivityLogDoc {
   id: string;

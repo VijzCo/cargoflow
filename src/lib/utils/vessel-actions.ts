@@ -126,7 +126,7 @@ export async function getVesselDetail(vesselId: string) {
 
   // Pull attached containers
   type ContainerLite = {
-    id: string; containerNumber: string; type: string;
+    id: string; containerNumber: string; carrierNumber?: string; type: string;
     loadedCbm: number; usableCbm: number; status: string;
   };
   const containers: ContainerLite[] = [];
@@ -139,6 +139,7 @@ export async function getVesselDetail(vesselId: string) {
         containers.push({
           id: d.id,
           containerNumber: data.containerNumber,
+          carrierNumber: (data.carrierNumber as string | undefined) || undefined,
           type: data.type,
           loadedCbm: data.loadedCbm ?? 0,
           usableCbm: data.usableCbm ?? 0,
@@ -349,6 +350,7 @@ export async function listAttachableContainers() {
     return {
       id: d.id,
       containerNumber: data.containerNumber as string,
+      carrierNumber: (data.carrierNumber as string | undefined) || undefined,
       type: data.type as string,
       loadedCbm: (data.loadedCbm ?? 0) as number,
       usableCbm: (data.usableCbm ?? 0) as number,

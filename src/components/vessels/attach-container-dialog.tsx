@@ -27,7 +27,7 @@ export function AttachContainerDialog({
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [containers, setContainers] = useState<{
-    id: string; containerNumber: string; type: string;
+    id: string; containerNumber: string; carrierNumber?: string; type: string;
     loadedCbm: number; usableCbm: number; status: "Open" | "Sealed";
   }[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -121,7 +121,7 @@ export function AttachContainerDialog({
                       <TableCell className="font-mono text-sm">
                         <div className="flex items-center gap-2">
                           <ContainerIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                          {c.containerNumber}
+                          {c.carrierNumber || c.containerNumber}
                         </div>
                       </TableCell>
                       <TableCell><Badge variant="outline">{c.type}</Badge></TableCell>

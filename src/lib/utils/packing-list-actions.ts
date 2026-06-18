@@ -134,7 +134,7 @@ export async function previewPackingLists(vesselId: string): Promise<PackingList
     const snap = await adminDb.collection("containers").where("id", "in", chunk).get();
     for (const d of snap.docs) {
       const data = d.data();
-      containers.push({ id: d.id, number: data.containerNumber, itemIds: data.itemIds ?? [] });
+      containers.push({ id: d.id, number: (data.carrierNumber as string | undefined) || (data.containerNumber as string), itemIds: data.itemIds ?? [] });
     }
   }
 
@@ -222,7 +222,7 @@ export async function generatePackingLists(input: z.infer<typeof GenerateSchema>
     const snap = await adminDb.collection("containers").where("id", "in", chunk).get();
     for (const d of snap.docs) {
       const data = d.data();
-      containers.push({ id: d.id, number: data.containerNumber, itemIds: data.itemIds ?? [] });
+      containers.push({ id: d.id, number: (data.carrierNumber as string | undefined) || (data.containerNumber as string), itemIds: data.itemIds ?? [] });
     }
   }
 

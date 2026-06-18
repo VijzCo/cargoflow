@@ -17,7 +17,7 @@ import { dispatchVessel, detachContainerFromVessel, type VesselView } from "@/li
 import { formatDate } from "@/lib/utils/format";
 
 interface ContainerLite {
-  id: string; containerNumber: string; type: string;
+  id: string; containerNumber: string; carrierNumber?: string; type: string;
   loadedCbm: number; usableCbm: number; status: string;
 }
 
@@ -153,7 +153,7 @@ export function VesselDetailClient({
                     <TableRow key={c.id}>
                       <TableCell>
                         <Link href={`/containers/${c.id}`} className="font-mono text-sm hover:underline">
-                          {c.containerNumber}
+                          {c.carrierNumber || c.containerNumber}
                         </Link>
                       </TableCell>
                       <TableCell><Badge variant="outline">{c.type}</Badge></TableCell>
@@ -171,7 +171,7 @@ export function VesselDetailClient({
                             size="icon"
                             variant="ghost"
                             className="h-7 w-7"
-                            onClick={() => detach(c.id, c.containerNumber)}
+                            onClick={() => detach(c.id, c.carrierNumber || c.containerNumber)}
                             disabled={working}
                             title="Detach"
                           >

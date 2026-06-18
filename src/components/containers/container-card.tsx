@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils/format";
 export type ContainerCardData = {
   id: string;
   containerNumber: string;
+  carrierNumber?: string;
   type: "20FT" | "40FT";
   capacityCbm: number;
   usableCbm: number;
@@ -21,6 +22,8 @@ export type ContainerCardData = {
 export function ContainerCard({ container }: { container: ContainerCardData }) {
   const pct = Math.min(100, Math.round(container.utilization * 100));
   const remaining = Math.max(0, container.usableCbm - container.loadedCbm);
+  const primaryLabel = container.carrierNumber || container.containerNumber;
+  const showSystemHint = !!container.carrierNumber && container.carrierNumber !== container.containerNumber;
 
   const statusVariant =
     container.status === "Open" ? "info" :
@@ -41,7 +44,7 @@ export function ContainerCard({ container }: { container: ContainerCardData }) {
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <ContainerIcon className="h-4 w-4 text-muted-foreground" />
-                <span className="font-mono font-medium">{container.containerNumber}</span>
+                <span className="font-mono font-medium">{primaryLabel}</span>
               </div>
               <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                 <Badge variant="outline">{container.type}</Badge>
@@ -50,6 +53,11 @@ export function ContainerCard({ container }: { container: ContainerCardData }) {
                   <span>· {container.supplierCount} supplier{container.supplierCount === 1 ? "" : "s"}</span>
                 )}
               </div>
+              {showSystemHint && (
+                <div className="mt-1 font-mono text-[10px] text-muted-foreground">
+                  System: {container.containerNumber}
+                </div>
+              )}
             </div>
             <Badge variant={statusVariant} className="gap-1">
               {container.status === "Open" && <Check className="h-3 w-3" />}

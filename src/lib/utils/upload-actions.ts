@@ -35,6 +35,11 @@ const POItemInputSchema = z.object({
   salesChannel: z.string().optional(),
   remarks: z.string().optional(),
 
+  // Fabric-only details (parser fills these for any item that has the columns).
+  composition: z.string().optional(),
+  reference: z.string().optional(),
+  shade: z.string().optional(),
+
   uniqueKey: z.string().min(1),
 });
 
@@ -269,6 +274,19 @@ export async function savePO(input: z.infer<typeof SavePOSchema>) {
 
     for (const item of group.items) {
       const itemRef = adminDb.collection("po_items").doc();
+
+      // Interpretation A — if a fabric field came in from the Excel,
+      // lock it immediately. If it's missing, leave it editable until a
+      // merchant sets it via the dialog.
+      const composition = item.composition?.trim() || undefined;
+      const reference   = item.reference?.trim()   || undefined;
+      const shade       = item.shade?.trim()       || undefined;
+      const fabricLocks = {
+        composition: !!composition,
+        reference:   !!reference,
+        shade:       !!shade,
+      };
+
       batch.set(itemRef, {
         id: itemRef.id,
         poId: poRef.id,
@@ -286,6 +304,10 @@ export async function savePO(input: z.infer<typeof SavePOSchema>) {
         deliveryDate: item.deliveryDate,
         salesChannel: item.salesChannel,
         remarks: item.remarks,
+        composition,
+        reference,
+        shade,
+        fabricLocks,
         uniqueKey: item.uniqueKey,
         status: "Pending" as POItemStatus,
         cbm: 0,

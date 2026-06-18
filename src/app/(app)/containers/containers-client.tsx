@@ -35,7 +35,10 @@ export function ContainersClient({
       if (typeFilter !== ALL && c.type !== typeFilter) return false;
       if (search.trim()) {
         const s = search.toLowerCase();
-        if (!c.containerNumber.toLowerCase().includes(s)) return false;
+        const hit =
+          c.containerNumber.toLowerCase().includes(s) ||
+          (c.carrierNumber?.toLowerCase().includes(s) ?? false);
+        if (!hit) return false;
       }
       return true;
     });

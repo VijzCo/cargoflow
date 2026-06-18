@@ -99,6 +99,24 @@ export function CBMUpdateDialog({ item, open, onOpenChange, allowMarkCompleted =
         </DialogHeader>
 
         <div className="space-y-4">
+          {item.category === "Fabric" && (item.composition || item.reference || item.shade) && (
+            <div className="rounded-md border bg-muted/40 p-3">
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Fabric reference
+              </p>
+              <div className="space-y-0.5 text-sm">
+                {item.composition && (
+                  <div><span className="text-xs text-muted-foreground">Composition:</span> {item.composition}</div>
+                )}
+                {item.reference && (
+                  <div><span className="text-xs text-muted-foreground">Reference:</span> {item.reference}</div>
+                )}
+                {item.shade && (
+                  <div><span className="text-xs text-muted-foreground">Approved shade:</span> {item.shade}</div>
+                )}
+              </div>
+            </div>
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="cbm">{t("cbmField")} *</Label>

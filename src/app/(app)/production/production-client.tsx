@@ -142,6 +142,7 @@ export function ProductionClient({
   const canUpdateCBM = hasPermission(role, "po_items.update_cbm");
   const t = useTranslations("production");
   const tStatus = useTranslations("status");
+  const hasAnyFabric = useMemo(() => filtered.some((i) => i.category === "Fabric"), [filtered]);
 
   // ---- Render ----
   return (
@@ -226,6 +227,7 @@ export function ProductionClient({
                   <TableHead>{t("colColor")}</TableHead>
                   <TableHead>{t("colSize")}</TableHead>
                   <TableHead className="text-right">{t("colQty")}</TableHead>
+                  {hasAnyFabric && <TableHead>Fabric</TableHead>}
                   <TableHead className="text-right">{t("colCBM")}</TableHead>
                   <TableHead>{t("colDelivery")}</TableHead>
                   <TableHead>{t("colStatus")}</TableHead>
@@ -254,6 +256,19 @@ export function ProductionClient({
                       <TableCell className="text-right font-mono text-sm">
                         {formatNumber(item.quantity)} <span className="text-xs text-muted-foreground">{item.unit}</span>
                       </TableCell>
+                      {hasAnyFabric && (
+                        <TableCell className="max-w-[200px] text-xs">
+                          {item.category === "Fabric" ? (
+                            <FabricInlineSummary
+                              composition={item.composition}
+                              reference={item.reference}
+                              shade={item.shade}
+                            />
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                      )}
                       <TableCell className="text-right font-mono text-sm">
                         {item.cbm > 0 ? formatCBM(item.cbm) : <span className="text-muted-foreground">—</span>}
                       </TableCell>
@@ -308,5 +323,28 @@ function KPI({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function FabricInlineSummary({
+  composition, reference, shade,
+}: {
+  composition?: string; reference?: string; shade?: string;
+}) {
+  const parts: { label: string; value?: string }[] = [
+    { label: "Comp", value: composition },
+    { label: "Ref",  value: reference },
+    { label: "Shade", value: shade },
+  ];
+  const any = parts.some((p) => p.value);
+  if (!any) return <span className="italic text-muted-foreground">not set</span>;
+  return (
+    <div className="space-y-0.5 leading-tight">
+      {parts.map((p) => p.value ? (
+        <div key={p.label} className="truncate">
+          <span className="text-muted-foreground">{p.label}:</span> {p.value}
+        </div>
+      ) : null)}
+    </div>
   );
 }

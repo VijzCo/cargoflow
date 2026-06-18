@@ -15,7 +15,10 @@ import { CONTAINER_CAPACITY, type ContainerType } from "@/types";
 
 export type ContainerView = {
   id: string;
-  containerNumber: string;
+  containerNumber: string;        // system identifier — always present
+  carrierNumber?: string;         // carrier-issued ID; preferred for display when set
+  /** Convenience field — what UI should display (carrierNumber if set, else containerNumber). */
+  displayNumber: string;
   type: ContainerType;
   capacityCbm: number;
   usableCbm: number;
@@ -49,9 +52,13 @@ function toContainerView(doc: FirebaseFirestore.QueryDocumentSnapshot | Firebase
   const d = doc.data()!;
   const loadedCbm = d.loadedCbm ?? 0;
   const usableCbm = d.usableCbm ?? d.capacityCbm ?? 0;
+  const containerNumber = d.containerNumber as string;
+  const carrierNumber = (d.carrierNumber as string | undefined) || undefined;
   return {
     id: doc.id,
-    containerNumber: d.containerNumber,
+    containerNumber,
+    carrierNumber,
+    displayNumber: carrierNumber || containerNumber,
     type: d.type,
     capacityCbm: d.capacityCbm,
     usableCbm,
@@ -82,24 +89,70 @@ async function getUsablePercent(): Promise<number> {
 // =============================================================================
 
 const CreateContainerSchema = z.object({
-  containerNumber: z.string().min(2).max(40),
+  // Optional now. If supplied, it's stored as the carrierNumber so it can later
+  // be edited. If omitted, a sequential system identifier is generated like
+  // CTR-2026-04-001 and stored as containerNumber; the carrier number can be
+  // set later via renameCarrierNumber before sealing.
+  containerNumber: z.string().min(2).max(40).optional(),
   type: z.enum(["20FT", "40FT"]),
 });
+
+/** Generate a sequential system identifier like CTR-YYYY-MM-NNN. */
+async function generateSystemNumber(): Promise<string> {
+  const now = new Date();
+  const yyyy = now.getUTCFullYear();
+  const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
+  const prefix = `CTR-${yyyy}-${mm}-`;
+
+  // Find the highest existing suffix for this prefix.
+  const snap = await adminDb.collection("containers")
+    .where("containerNumber", ">=", prefix)
+    .where("containerNumber", "<", prefix + "\uf8ff")
+    .get();
+  let max = 0;
+  for (const d of snap.docs) {
+    const cn = d.data().containerNumber as string;
+    const suffix = cn.slice(prefix.length);
+    const n = parseInt(suffix, 10);
+    if (Number.isFinite(n) && n > max) max = n;
+  }
+  return `${prefix}${String(max + 1).padStart(3, "0")}`;
+}
 
 export async function createContainer(input: z.infer<typeof CreateContainerSchema>) {
   const user = await requireSessionUser();
   if (!hasPermission(user.role, "containers.create")) {
     throw new Error("You don't have permission to create containers.");
   }
-  const { containerNumber, type } = CreateContainerSchema.parse(input);
+  const { containerNumber: suppliedNumber, type } = CreateContainerSchema.parse(input);
 
-  // Reject duplicate numbers
-  const dupSnap = await adminDb.collection("containers")
-    .where("containerNumber", "==", containerNumber)
-    .limit(1)
-    .get();
-  if (!dupSnap.empty) {
-    throw new Error(`Container "${containerNumber}" already exists.`);
+  // Decide what goes into containerNumber (the immutable system ID) vs carrierNumber.
+  // - If supplied:    user gave us the real carrier ID up front → store it as the carrierNumber,
+  //                   and STILL generate a system ID for the immutable identifier.
+  // - If omitted:     generate a system ID; carrierNumber stays empty (settable later).
+  let systemNumber: string;
+  let carrierNumber: string | undefined;
+  if (suppliedNumber && suppliedNumber.trim().length > 0) {
+    const trimmed = suppliedNumber.trim().toUpperCase();
+    // Reject duplicates on either field
+    const dupSysSnap = await adminDb.collection("containers")
+      .where("containerNumber", "==", trimmed)
+      .limit(1)
+      .get();
+    const dupCarSnap = await adminDb.collection("containers")
+      .where("carrierNumber", "==", trimmed)
+      .limit(1)
+      .get();
+    if (!dupSysSnap.empty || !dupCarSnap.empty) {
+      throw new Error(`Container "${trimmed}" already exists.`);
+    }
+    // Store the supplied value as the carrier number — that's the real-world ID.
+    // Generate a system ID as the internal identifier.
+    carrierNumber = trimmed;
+    systemNumber = await generateSystemNumber();
+  } else {
+    systemNumber = await generateSystemNumber();
+    carrierNumber = undefined;
   }
 
   const capacityCbm = CONTAINER_CAPACITY[type];
@@ -109,7 +162,8 @@ export async function createContainer(input: z.infer<typeof CreateContainerSchem
   const ref = adminDb.collection("containers").doc();
   await ref.set({
     id: ref.id,
-    containerNumber,
+    containerNumber: systemNumber,
+    carrierNumber,
     type,
     capacityCbm,
     usableCbm,
@@ -129,11 +183,11 @@ export async function createContainer(input: z.infer<typeof CreateContainerSchem
     action: "container.create",
     targetType: "container",
     targetId: ref.id,
-    details: { containerNumber, type, capacityCbm, usableCbm },
+    details: { containerNumber: systemNumber, carrierNumber, type, capacityCbm, usableCbm },
   });
 
   revalidatePath("/containers");
-  return { id: ref.id };
+  return { id: ref.id, containerNumber: systemNumber, carrierNumber };
 }
 
 // =============================================================================
@@ -419,6 +473,79 @@ export async function removeFromContainer(itemId: string) {
   revalidatePath(`/containers/${item.containerId}`);
   revalidatePath("/containers");
   return { ok: true };
+}
+
+// =============================================================================
+// renameCarrierNumber — set/change the real-world carrier-issued container ID.
+// Allowed only while the container is Open (not yet sealed). Locked after seal.
+// =============================================================================
+
+const RenameSchema = z.object({
+  containerId: z.string().min(1),
+  carrierNumber: z.string().trim().min(2).max(40),
+});
+
+export async function renameCarrierNumber(input: z.infer<typeof RenameSchema>) {
+  const user = await requireSessionUser();
+  if (!hasPermission(user.role, "containers.create")) {
+    throw new Error("You don't have permission to rename containers.");
+  }
+  const { containerId, carrierNumber } = RenameSchema.parse(input);
+  const trimmed = carrierNumber.toUpperCase();
+
+  const ref = adminDb.collection("containers").doc(containerId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error("Container not found.");
+  const data = snap.data()!;
+
+  if (data.status !== "Open") {
+    throw new Error("Carrier number can only be edited while the container is Open (before sealing).");
+  }
+
+  if ((data.carrierNumber ?? "") === trimmed) {
+    return { ok: true, unchanged: true };
+  }
+
+  // Reject duplicates on either field across the system.
+  const dupSysSnap = await adminDb.collection("containers")
+    .where("containerNumber", "==", trimmed)
+    .limit(1)
+    .get();
+  if (!dupSysSnap.empty && dupSysSnap.docs[0]!.id !== containerId) {
+    throw new Error(`Container "${trimmed}" already exists.`);
+  }
+  const dupCarSnap = await adminDb.collection("containers")
+    .where("carrierNumber", "==", trimmed)
+    .limit(1)
+    .get();
+  if (!dupCarSnap.empty && dupCarSnap.docs[0]!.id !== containerId) {
+    throw new Error(`Carrier number "${trimmed}" is already in use by another container.`);
+  }
+
+  const previous = (data.carrierNumber as string | undefined) ?? null;
+
+  await ref.update({
+    carrierNumber: trimmed,
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+
+  await writeActivityLog({
+    userId: user.uid,
+    userEmail: user.email,
+    userRole: user.role,
+    action: "container.rename",
+    targetType: "container",
+    targetId: containerId,
+    details: {
+      containerNumber: data.containerNumber,
+      from: previous,
+      to: trimmed,
+    },
+  });
+
+  revalidatePath(`/containers/${containerId}`);
+  revalidatePath("/containers");
+  return { ok: true, carrierNumber: trimmed };
 }
 
 // =============================================================================
