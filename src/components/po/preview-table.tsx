@@ -282,8 +282,6 @@ export function PreviewTable({
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>
-              </TableRow>
-            </TableHeader>
             <TableBody>
               {activeRows.map((r) => {
                 const hasIssue =
