@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   LayoutDashboard, FileSpreadsheet, Factory, Container, Ship,
-  Package, BarChart3, Users, Building2, Settings, History, Menu, X,
+  Package, BarChart3, Users, Building2, Settings, History, Menu, X, ClipboardCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils/format";
 import type { Role } from "@/types";
@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 interface NavItem {
   href: string;
   /** Key into the `nav` translation namespace */
-  labelKey: "dashboard" | "purchaseOrders" | "production" | "containers" | "vessels" | "packingLists" | "reports" | "users" | "suppliers" | "activity" | "settings" | "admin";
+  labelKey: "dashboard" | "purchaseOrders" | "production" | "containers" | "vessels" | "packingLists" | "reports" | "users" | "suppliers" | "activity" | "settings" | "admin" | "approvals";
   icon: React.ComponentType<{ className?: string }>;
   permissions: Permission[];
 }
@@ -32,6 +32,7 @@ const NAV: NavItem[] = [
 ];
 
 const ADMIN_NAV: NavItem[] = [
+  { href: "/admin/approvals", labelKey: "approvals", icon: ClipboardCheck, permissions: ["po_items.edit_approve", "po_items.edit_request"] },
   { href: "/admin/users", labelKey: "users", icon: Users, permissions: ["users.view"] },
   { href: "/admin/suppliers", labelKey: "suppliers", icon: Building2, permissions: ["suppliers.view"] },
   { href: "/admin/activity", labelKey: "activity", icon: History, permissions: ["activity_logs.view"] },

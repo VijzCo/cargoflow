@@ -1,11 +1,14 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useTheme } from "next-themes";
 import { useTranslations } from "next-intl";
 import { LogOut, Moon, Sun, Bell, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/components/auth/auth-provider";
 import { LanguageToggle } from "@/components/layout/language-toggle";
+import { countPendingApprovalsForCurrentUser } from "@/lib/utils/edit-request-actions";
 import type { SessionUser } from "@/lib/rbac/session-shared";
 
 export function Topbar({ user }: { user: SessionUser }) {
@@ -24,6 +28,20 @@ export function Topbar({ user }: { user: SessionUser }) {
   const { signOut } = useAuth();
   const tTop = useTranslations("topbar");
   const tRoles = useTranslations("roles");
+  const [pendingCount, setPendingCount] = useState<number>(0);
+
+  // Approver bell: poll every 60s; cheap call, capped at 100 docs
+  useEffect(() => {
+    let cancelled = false;
+    function tick() {
+      countPendingApprovalsForCurrentUser()
+        .then((n) => { if (!cancelled) setPendingCount(n); })
+        .catch(() => {});
+    }
+    tick();
+    const id = setInterval(tick, 60_000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
 
   async function handleSignOut() {
     try {
@@ -54,8 +72,18 @@ export function Topbar({ user }: { user: SessionUser }) {
           <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
         </Button>
 
-        <Button variant="ghost" size="icon" aria-label="Notifications" disabled>
-          <Bell className="h-4 w-4" />
+        <Button variant="ghost" size="icon" aria-label="Pending approvals" className="relative" asChild>
+          <Link href="/admin/approvals">
+            <Bell className="h-4 w-4" />
+            {pendingCount > 0 && (
+              <Badge
+                variant="destructive"
+                className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] leading-none"
+              >
+                {pendingCount > 99 ? "99+" : pendingCount}
+              </Badge>
+            )}
+          </Link>
         </Button>
 
         <DropdownMenu>

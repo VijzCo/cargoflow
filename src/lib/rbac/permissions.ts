@@ -21,6 +21,10 @@ export type Permission =
   | "purchase_orders.view" | "purchase_orders.upload" | "purchase_orders.update" | "purchase_orders.delete"
   // PO items
   | "po_items.view" | "po_items.update_status" | "po_items.update_cbm" | "po_items.assign_container"
+  // PO item edits (approval workflow)
+  | "po_items.edit_direct"        // edit/delete without approval
+  | "po_items.edit_request"       // submit a request that needs approval
+  | "po_items.edit_approve"       // approve/reject others' requests
   // Containers
   | "containers.view" | "containers.create" | "containers.assign" | "containers.seal"
   // Vessels
@@ -39,6 +43,7 @@ const ALL: Permission[] = [
   "suppliers.view", "suppliers.create", "suppliers.update", "suppliers.delete",
   "purchase_orders.view", "purchase_orders.upload", "purchase_orders.update", "purchase_orders.delete",
   "po_items.view", "po_items.update_status", "po_items.update_cbm", "po_items.assign_container",
+  "po_items.edit_direct", "po_items.edit_request", "po_items.edit_approve",
   "containers.view", "containers.create", "containers.assign", "containers.seal",
   "vessels.view", "vessels.create", "vessels.update", "vessels.dispatch",
   "packing_lists.view", "packing_lists.generate", "packing_lists.export",
@@ -50,11 +55,26 @@ const ALL: Permission[] = [
 export const PERMISSIONS_BY_ROLE: Record<Role, Permission[]> = {
   super_admin: ALL,
 
+  merchant_manager: [
+    "users.view",
+    "suppliers.view", "suppliers.create", "suppliers.update",
+    "purchase_orders.view", "purchase_orders.upload", "purchase_orders.update",
+    "po_items.view", "po_items.assign_container",
+    "po_items.edit_direct", "po_items.edit_request", "po_items.edit_approve",
+    "containers.view", "containers.create", "containers.assign", "containers.seal",
+    "vessels.view", "vessels.create", "vessels.update", "vessels.dispatch",
+    "packing_lists.view", "packing_lists.generate", "packing_lists.export",
+    "reports.view", "reports.export",
+    "settings.view",
+    "activity_logs.view",
+  ],
+
   merchant: [
     "users.view",
     "suppliers.view", "suppliers.create", "suppliers.update",
     "purchase_orders.view", "purchase_orders.upload", "purchase_orders.update",
     "po_items.view", "po_items.assign_container",
+    "po_items.edit_request",       // can request only — not direct, not approve
     "containers.view", "containers.create", "containers.assign", "containers.seal",
     "vessels.view", "vessels.create", "vessels.update", "vessels.dispatch",
     "packing_lists.view", "packing_lists.generate", "packing_lists.export",

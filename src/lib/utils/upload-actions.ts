@@ -189,7 +189,7 @@ export async function listSuppliers() {
 }
 
 export async function updateSupplierActive(id: string, active: boolean) {
-  const user = await requireRole(["super_admin", "merchant"]);
+  const user = await requireRole(["super_admin", "merchant_manager", "merchant"]);
   await adminDb.collection("suppliers").doc(id).update({
     active,
     updatedAt: FieldValue.serverTimestamp(),

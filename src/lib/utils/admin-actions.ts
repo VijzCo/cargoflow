@@ -62,7 +62,7 @@ export async function listUsers(): Promise<UserView[]> {
 const CreateUserSchema = z.object({
   email: z.string().email(),
   displayName: z.string().min(1).max(100),
-  role: z.enum(["super_admin", "merchant", "supplier", "logistics", "viewer"]),
+  role: z.enum(["super_admin", "merchant_manager", "merchant", "supplier", "logistics", "viewer"]),
   supplierId: z.string().optional(),
 });
 
@@ -127,7 +127,7 @@ export async function createUser(input: z.infer<typeof CreateUserSchema>) {
 
 const UpdateUserRoleSchema = z.object({
   uid: z.string().min(1),
-  role: z.enum(["super_admin", "merchant", "supplier", "logistics", "viewer"]),
+  role: z.enum(["super_admin", "merchant_manager", "merchant", "supplier", "logistics", "viewer"]),
   supplierId: z.string().optional(),
 });
 

@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
-import { ArrowLeft, Building2, Calendar, Hash, ShoppingBag, Box } from "lucide-react";
+import { ArrowLeft, Building2, Calendar, Hash, ShoppingBag, Box, Clock } from "lucide-react";
 import { getSessionUser } from "@/lib/rbac/session";
 import { hasPermission } from "@/lib/rbac/permissions";
 import { getPODetail } from "@/lib/utils/production-actions";
+import { adminDb } from "@/lib/firebase/admin";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +30,27 @@ export default async function PODetailPage({ params }: { params: { poId: string 
   const canUpdateCBM = hasPermission(user.role, "po_items.update_cbm");
   const canUpdateStatus = hasPermission(user.role, "po_items.update_status") || isSupplier;
   const canEditFabric = hasPermission(user.role, "purchase_orders.update");
+  const canEditDirect = hasPermission(user.role, "po_items.edit_direct");
+  const canEditRequest = hasPermission(user.role, "po_items.edit_request");
+
+  // Fetch all pending edit requests for THIS PO's items (one query)
+  const pendingMap = new Map<string, { id: string; type: "update" | "delete"; requestedBy: string; requestedByEmail: string }>();
+  if (!isSupplier) {
+    const pendingSnap = await adminDb
+      .collection("item_edit_requests")
+      .where("poId", "==", params.poId)
+      .where("status", "==", "pending")
+      .get();
+    for (const d of pendingSnap.docs) {
+      const data = d.data();
+      pendingMap.set(data.itemId as string, {
+        id: d.id,
+        type: data.type,
+        requestedBy: data.requestedBy,
+        requestedByEmail: data.requestedByEmail,
+      });
+    }
+  }
 
   // Sort items: by category then style then color then size
   const sortedItems = [...items].sort((a, b) =>
@@ -119,7 +141,15 @@ export default async function PODetailPage({ params }: { params: { poId: string 
                   <TableCell className="text-right font-mono text-sm">{item.cbm.toFixed(2)}</TableCell>
                   <TableCell className="text-right font-mono text-sm">{item.packageCount || "—"}</TableCell>
                   <TableCell>
-                    <StatusCell status={item.status} />
+                    <div className="flex flex-col gap-1">
+                      <StatusCell status={item.status} />
+                      {pendingMap.has(item.id) && (
+                        <Badge variant="warning" className="gap-1 text-[10px]">
+                          <Clock className="h-2.5 w-2.5" />
+                          {pendingMap.get(item.id)!.type === "delete" ? "Pending delete" : "Pending edit"}
+                        </Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <ItemActions
@@ -127,6 +157,10 @@ export default async function PODetailPage({ params }: { params: { poId: string 
                       canUpdateStatus={canUpdateStatus}
                       canUpdateCBM={canUpdateCBM}
                       isSupplier={isSupplier}
+                      canEditDirect={canEditDirect}
+                      canEditRequest={canEditRequest}
+                      pendingRequest={pendingMap.get(item.id) ?? null}
+                      currentUserId={user.uid}
                     />
                   </TableCell>
                 </TableRow>

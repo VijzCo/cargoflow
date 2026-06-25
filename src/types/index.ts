@@ -4,10 +4,11 @@ import type { Timestamp } from "firebase/firestore";
 // Roles & Permissions
 // =============================================================================
 
-export type Role = "super_admin" | "merchant" | "supplier" | "logistics" | "viewer";
+export type Role = "super_admin" | "merchant_manager" | "merchant" | "supplier" | "logistics" | "viewer";
 
 export const ROLES: Record<Role, { label: string; description: string }> = {
   super_admin: { label: "Super Admin", description: "Full access to all modules and settings." },
+  merchant_manager: { label: "Merchant Manager", description: "Manages merchants and approves item edit requests." },
   merchant: { label: "Merchant", description: "Upload POs, manage vessels & packing lists." },
   supplier: { label: "Supplier", description: "View and update only assigned items." },
   logistics: { label: "Logistics", description: "Container loading & packing validation." },
@@ -278,7 +279,14 @@ export type ActivityAction =
   | "vessel.create" | "vessel.dispatch"
   | "packing_list.generate"
   | "settings.update"
-  | "item.fabric_update";
+  | "item.fabric_update"
+  | "item.direct_edit"           // edited directly by super_admin or merchant_manager
+  | "item.direct_delete"         // deleted directly
+  | "item.edit_requested"        // merchant submitted an edit request
+  | "item.delete_requested"      // merchant submitted a delete request
+  | "item.request_approved"      // approver approved
+  | "item.request_rejected"      // approver rejected
+  | "item.request_cancelled";    // merchant cancelled their own pending request
 
 export interface ActivityLogDoc {
   id: string;
@@ -290,4 +298,43 @@ export interface ActivityLogDoc {
   targetId: string;
   details?: Record<string, unknown>;
   createdAt: Timestamp | null;
+}
+
+// =============================================================================
+// Item edit requests (approval workflow)
+// =============================================================================
+
+export type EditRequestType = "update" | "delete";
+export type EditRequestStatus = "pending" | "approved" | "rejected" | "cancelled";
+
+/** Fields editable through this workflow. Keys map directly onto POItemDoc fields. */
+export type ItemEditableField =
+  | "poNumbers" | "style" | "color" | "size" | "quantity" | "unit" | "unitPrice"
+  | "category" | "description" | "deliveryDate" | "salesChannel" | "remarks";
+
+export interface ItemEditRequestDoc {
+  id: string;
+  itemId: string;
+  poId: string;
+  supplierId: string;             // copied at request time for RBAC isolation
+  type: EditRequestType;
+  status: EditRequestStatus;
+
+  // For "update" requests:
+  // proposedChanges holds ONLY the fields the requester wants to change,
+  // with their new values. previousValues is the snapshot for diffing.
+  proposedChanges?: Partial<Record<ItemEditableField, unknown>>;
+  previousValues?: Partial<Record<ItemEditableField, unknown>>;
+
+  reason?: string;                // optional justification from the requester
+
+  requestedBy: string;            // uid
+  requestedByEmail: string;
+  requestedAt: Timestamp | null;
+
+  // Set when status leaves "pending"
+  resolvedBy?: string;            // uid of approver/rejector
+  resolvedByEmail?: string;
+  resolvedAt?: Timestamp | null;
+  resolverNote?: string;          // approver/rejector comment
 }

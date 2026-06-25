@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { StatusPill } from "@/components/production/status-pill";
 import { ItemActions } from "@/components/production/item-actions";
+import { listPendingForItems } from "@/lib/utils/edit-request-actions";
 import { formatNumber, formatDate, formatCBM } from "@/lib/utils/format";
 import { hasPermission } from "@/lib/rbac/permissions";
 import type { Role, POItemStatus } from "@/types";
@@ -32,10 +33,16 @@ export function ProductionClient({
   role,
   supplierId,
   suppliers,
+  currentUserId,
+  canEditDirect = false,
+  canEditRequest = false,
 }: {
   role: Role;
   supplierId?: string;
   suppliers: { id: string; name: string }[];
+  currentUserId?: string;
+  canEditDirect?: boolean;
+  canEditRequest?: boolean;
 }) {
   const isSupplier = role === "supplier";
 
@@ -44,6 +51,7 @@ export function ProductionClient({
   const [supplierFilter, setSupplierFilter] = useState<string>(isSupplier ? supplierId ?? ALL : ALL);
   const [statusFilter, setStatusFilter] = useState<string>(ALL);
   const [search, setSearch] = useState("");
+  const [pendingMap, setPendingMap] = useState<Map<string, { id: string; type: "update" | "delete"; requestedBy: string }>>(new Map());
 
   // ---- Real-time subscription ----
   useEffect(() => {
@@ -106,6 +114,22 @@ export function ProductionClient({
 
     return unsub;
   }, [isSupplier, supplierId, supplierFilter, statusFilter]);
+
+  // ---- Fetch pending requests for currently visible items ----
+  useEffect(() => {
+    if (isSupplier || items.length === 0) {
+      setPendingMap(new Map());
+      return;
+    }
+    let cancelled = false;
+    listPendingForItems(items.map((i) => i.id)).then((map) => {
+      if (cancelled) return;
+      const next = new Map<string, { id: string; type: "update" | "delete"; requestedBy: string }>();
+      for (const [k, v] of Object.entries(map)) next.set(k, v);
+      setPendingMap(next);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [isSupplier, items]);
 
   // ---- Client-side text search filter ----
   const filtered = useMemo(() => {
@@ -278,13 +302,26 @@ export function ProductionClient({
                           {overdue && <Badge variant="destructive" className="ml-1">{t("overdue")}</Badge>}
                         </span>
                       </TableCell>
-                      <TableCell><StatusPill status={item.status} /></TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          <StatusPill status={item.status} />
+                          {pendingMap.has(item.id) && (
+                            <Badge variant="warning" className="gap-1 text-[10px]">
+                              {pendingMap.get(item.id)!.type === "delete" ? "Pending delete" : "Pending edit"}
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <ItemActions
                           item={item}
                           canUpdateStatus={canUpdateStatus}
                           canUpdateCBM={canUpdateCBM}
                           isSupplier={isSupplier}
+                          canEditDirect={canEditDirect}
+                          canEditRequest={canEditRequest}
+                          pendingRequest={pendingMap.get(item.id) ?? null}
+                          currentUserId={currentUserId}
                         />
                       </TableCell>
                     </TableRow>
