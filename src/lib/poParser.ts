@@ -370,6 +370,41 @@ function parseLegacy(rows: unknown[][]): ParseResult {
     .map((c) => (c == null ? "" : String(c)))
     .join(" ");
 
+  // CR — detect file-level fabric composition from descriptive lines.
+  // Composition lines typically contain a percentage and a fabric word
+  // (e.g. "94% polyester 6% spandex 130GSM"). Apply file-wide; individual
+  // rows can override via the Composition column if present.
+  function detectFileComposition(): string | undefined {
+    const FABRIC_WORDS = /(cotton|polyester|spandex|elastane|nylon|viscose|rayon|linen|silk|wool|acrylic|poly|tencel|modal|lyocell|bamboo|hemp|cashmere|polyamide)/i;
+    for (let r = 0; r < Math.min(rows.length, 30); r++) {
+      const cells = (rows[r] || []).map((c) => (c == null ? "" : String(c)).trim()).filter(Boolean);
+      for (const cell of cells) {
+        // Must contain a percentage AND a fabric word
+        if (/\d+\s*%/.test(cell) && FABRIC_WORDS.test(cell)) {
+          // Sanity check — not too long, not too short
+          if (cell.length > 8 && cell.length < 200) {
+            // Trim trailing "TOTAL WIDTH" / "WOVEN FABRIC" etc. — keep just
+            // composition + GSM if present.
+            const trimmed = cell
+              .split(/\bTOTAL\s+WIDTH\b|\bWOVEN\s+FABRIC\b|\bKNIT\s+FABRIC\b/i)[0]
+              .replace(/[,\s]+$/, "")
+              .trim();
+            return trimmed.length > 0 ? trimmed : cell;
+          }
+        }
+      }
+    }
+    return undefined;
+  }
+  const fileComposition = detectFileComposition();
+
+  // Detect file-level approved shade from a labeled cell ("approved shade: …")
+  function detectFileShade(): string | undefined {
+    const v = findCellByLabel(rows, /APPROVED\s*SHADE/i);
+    return v ? String(v).trim() || undefined : undefined;
+  }
+  const fileShade = detectFileShade();
+
   // Find the data header row
   let headerRowIdx = -1;
   let headerCells: string[] = [];
@@ -403,6 +438,10 @@ function parseLegacy(rows: unknown[][]): ParseResult {
   const cQty = findCol("quantity");
   const cUnit = findCol("unit");
   const cPrice = findCol("price");
+  // CR — fabric details columns (optional, only used for Fabric items)
+  const cFabricRef = findCol("fabric reference", "fabric ref", "ref#", "reference");
+  const cComposition = findCol("composition", "fabric composition");
+  const cShade = findCol("approved shade", "shade");
 
   // Combined "Size / Color" header — both lookups land on the same cell.
   if (cSize === cColor && cSize !== -1) {
@@ -551,6 +590,17 @@ function parseLegacy(rows: unknown[][]): ParseResult {
       result.errors.push({ row: r + 1, field: "PO Number", message: "No PO context found. Merchant must add PO during preview." });
     }
 
+    // CR — fabric details: per-row column > file-level fallback
+    const rowFabricRef = cFabricRef >= 0 && cFabricRef < cells.length
+      ? cells[cFabricRef].trim() || undefined
+      : undefined;
+    const rowComposition = cComposition >= 0 && cComposition < cells.length
+      ? cells[cComposition].trim() || undefined
+      : undefined;
+    const rowShade = cShade >= 0 && cShade < cells.length
+      ? cells[cShade].trim() || undefined
+      : undefined;
+
     const item: POItem = {
       supplier: supplier || "",
       poNumbers: rowPOs,
@@ -566,6 +616,9 @@ function parseLegacy(rows: unknown[][]): ParseResult {
       deliveryDate: rowDate,
       salesChannel: undefined,
       remarks: undefined,
+      composition: rowComposition || fileComposition,
+      reference: rowFabricRef,
+      shade: rowShade || fileShade,
       uniqueKey: makeUniqueKey(rowPOs, currentStyle, color, size),
       rawRowIndex: r + 1,
     };
