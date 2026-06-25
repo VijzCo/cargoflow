@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
-  Plus, Search, MoreVertical, KeyRound, UserX, UserCheck, Loader2, Copy, CheckCircle2,
+  Plus, Search, MoreVertical, KeyRound, UserX, UserCheck, Loader2, Copy, CheckCircle2, Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,9 +15,10 @@ import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { UserForm } from "@/components/admin/user-form";
+import { EditUserDialog } from "@/components/admin/edit-user-dialog";
 import { RoleBadge } from "@/components/admin/role-badge";
 import { setUserActive, sendPasswordResetForUser, type UserView } from "@/lib/utils/admin-actions";
 import { formatDate } from "@/lib/utils/format";
@@ -27,6 +28,7 @@ export function UsersClient({
 }: { initial: UserView[]; canManage: boolean; currentUid: string }) {
   const router = useRouter();
   const [createOpen, setCreateOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserView | null>(null);
   const [search, setSearch] = useState("");
   const [resetLink, setResetLink] = useState<{ link: string; email: string } | null>(null);
   const [working, startWork] = useTransition();
@@ -149,14 +151,20 @@ export function UsersClient({
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => setEditingUser(u)} disabled={working}>
+                                <Pencil className="mr-2 h-3.5 w-3.5" /> Edit user
+                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => resetPassword(u.uid, u.email)} disabled={working}>
                                 <KeyRound className="mr-2 h-3.5 w-3.5" /> Generate password reset
                               </DropdownMenuItem>
                               {!isMe && (
-                                <DropdownMenuItem onClick={() => toggle(u.uid, u.active)} disabled={working}>
-                                  {u.active ? <UserX className="mr-2 h-3.5 w-3.5" /> : <UserCheck className="mr-2 h-3.5 w-3.5" />}
-                                  {u.active ? "Deactivate" : "Reactivate"}
-                                </DropdownMenuItem>
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => toggle(u.uid, u.active)} disabled={working}>
+                                    {u.active ? <UserX className="mr-2 h-3.5 w-3.5" /> : <UserCheck className="mr-2 h-3.5 w-3.5" />}
+                                    {u.active ? "Deactivate" : "Reactivate"}
+                                  </DropdownMenuItem>
+                                </>
                               )}
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -203,6 +211,15 @@ export function UsersClient({
           </div>
         </DialogContent>
       </Dialog>
+
+      {editingUser && (
+        <EditUserDialog
+          user={editingUser}
+          open={!!editingUser}
+          onOpenChange={(o) => !o && setEditingUser(null)}
+          currentUid={currentUid}
+        />
+      )}
     </div>
   );
 }

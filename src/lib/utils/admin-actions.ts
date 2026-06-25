@@ -129,6 +129,7 @@ const UpdateUserRoleSchema = z.object({
   uid: z.string().min(1),
   role: z.enum(["super_admin", "merchant_manager", "merchant", "supplier", "logistics", "viewer"]),
   supplierId: z.string().optional(),
+  displayName: z.string().min(1).max(100).optional(),
 });
 
 export async function updateUserRole(input: z.infer<typeof UpdateUserRoleSchema>) {
@@ -139,17 +140,28 @@ export async function updateUserRole(input: z.infer<typeof UpdateUserRoleSchema>
     throw new Error("Supplier-role users must be linked to a supplier.");
   }
 
+  // Safety rail — super_admin cannot demote themselves (would lock them out)
+  if (data.uid === actor.uid && data.role !== "super_admin") {
+    throw new Error("You can't demote yourself from super admin. Ask another super admin to do it.");
+  }
+
   const ref = adminDb.collection("users").doc(data.uid);
   const snap = await ref.get();
   if (!snap.exists) throw new Error("User not found.");
   const previous = snap.data()!;
 
-  await ref.update({
+  // Build update object — only include fields actually changing
+  const updates: Record<string, unknown> = {
     role: data.role,
     supplierId: data.role === "supplier" ? data.supplierId : FieldValue.delete(),
     updatedAt: FieldValue.serverTimestamp(),
     updatedBy: actor.uid,
-  });
+  };
+  if (data.displayName && data.displayName !== previous.displayName) {
+    updates.displayName = data.displayName;
+  }
+
+  await ref.update(updates);
 
   await writeActivityLog({
     userId: actor.uid,
@@ -158,7 +170,12 @@ export async function updateUserRole(input: z.infer<typeof UpdateUserRoleSchema>
     action: "user.update",
     targetType: "user",
     targetId: data.uid,
-    details: { from: previous.role, to: data.role, email: previous.email },
+    details: {
+      from: previous.role,
+      to: data.role,
+      email: previous.email,
+      ...(data.displayName && data.displayName !== previous.displayName ? { nameChanged: { from: previous.displayName, to: data.displayName } } : {}),
+    },
   });
 
   revalidatePath("/admin/users");

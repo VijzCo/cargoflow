@@ -112,6 +112,7 @@ export function UserForm({ onCreated, onCancel }: {
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="super_admin">Super Admin — full control</SelectItem>
+            <SelectItem value="merchant_manager">Merchant Manager — approves merchant edit requests</SelectItem>
             <SelectItem value="merchant">Merchant — uploads POs, manages everything</SelectItem>
             <SelectItem value="logistics">Logistics — containers, vessels, packing lists</SelectItem>
             <SelectItem value="supplier">Supplier — updates own items only</SelectItem>
