@@ -35,6 +35,16 @@ interface EditableRow extends POItem {
   deleted?: boolean;
 }
 
+/** Build the unique key used for duplicate detection.
+ *  Must match what the backend uses: PO + Style + Color + Size (uppercased). */
+function computeDupeKey(r: EditableRow): string {
+  const po = (r.poNumbers[0] || "").trim().toUpperCase();
+  const style = (r.style || "").trim().toUpperCase();
+  const color = (r.color || "").trim().toUpperCase();
+  const size = (r.size || "").trim().toUpperCase();
+  return `${po}|${style}|${color}|${size}`;
+}
+
 export function PreviewTable({
   parseResult,
   filename,
@@ -110,21 +120,79 @@ export function PreviewTable({
     [activeRows],
   );
 
-  const errorList = useMemo(() => {
-    const errs: { row: number; field: string; message: string }[] = [...parseResult.errors];
-    for (const r of activeRows) {
-      if (!r.supplier) errs.push({ row: r.rawRowIndex, field: "Supplier", message: "Missing supplier name." });
-      if (!r.supplierId) errs.push({ row: r.rawRowIndex, field: "Supplier", message: `Supplier "${r.supplier}" not found in system.` });
-      if (!r.style) errs.push({ row: r.rawRowIndex, field: "Style", message: "Missing style." });
-      if (!r.color) errs.push({ row: r.rawRowIndex, field: "Color", message: "Missing color." });
-      if (!r.size) errs.push({ row: r.rawRowIndex, field: "Size", message: "Missing size." });
-      if (!r.quantity || r.quantity <= 0) errs.push({ row: r.rawRowIndex, field: "Quantity", message: "Quantity must be > 0." });
-      if (!r.poNumbers.length) errs.push({ row: r.rawRowIndex, field: "PO Number", message: "Missing PO number." });
-    }
-    return errs;
-  }, [parseResult.errors, activeRows]);
+  /** Per-row error messages, keyed by rowId. Live — recomputes as you edit.
+   *  This is the single source of truth for both the banner count AND
+   *  the amber row highlighting AND the inline per-row explanations. */
+  const rowErrors = useMemo(() => {
+    const map = new Map<string, string[]>();
+    const push = (rowId: string, msg: string) => {
+      const list = map.get(rowId) ?? [];
+      list.push(msg);
+      map.set(rowId, list);
+    };
 
-  const canSave = errorList.length === 0 && activeRows.length > 0 && !resolving;
+    // Per-row field validation
+    for (const r of activeRows) {
+      if (!r.supplier) push(r.rowId, "Missing supplier name.");
+      else if (!r.supplierId) push(r.rowId, `Supplier "${r.supplier}" not found in system — create it or pick a match.`);
+      if (!r.style) push(r.rowId, "Missing style.");
+      if (!r.color) push(r.rowId, "Missing color.");
+      if (!r.size) push(r.rowId, "Missing size.");
+      if (!r.quantity || r.quantity <= 0) push(r.rowId, "Quantity must be greater than 0.");
+      if (r.poNumbers.length === 0) push(r.rowId, "Missing PO number.");
+    }
+
+    // Cross-row duplicate detection. Group active rows by their PO+Style+Color+Size key,
+    // then flag every row in any group with 2+ members.
+    const keyGroups = new Map<string, EditableRow[]>();
+    for (const r of activeRows) {
+      const key = computeDupeKey(r);
+      // Skip incomplete rows — they'll be caught by the missing-field checks above
+      if (!key || key === "|||") continue;
+      const list = keyGroups.get(key) ?? [];
+      list.push(r);
+      keyGroups.set(key, list);
+    }
+
+    // Build display row-number lookup (1-based, in current on-screen order)
+    const displayRowNum = new Map<string, number>();
+    activeRows.forEach((r, i) => displayRowNum.set(r.rowId, i + 1));
+
+    for (const [, group] of keyGroups) {
+      if (group.length < 2) continue;
+      // For each member, list the OTHER rows it duplicates
+      for (const r of group) {
+        const others = group
+          .filter((o) => o.rowId !== r.rowId)
+          .map((o) => displayRowNum.get(o.rowId))
+          .filter((n): n is number => n != null)
+          .sort((a, b) => a - b);
+        const label = others.length === 1
+          ? `row ${others[0]}`
+          : `rows ${others.join(", ")}`;
+        push(r.rowId, `Duplicates ${label} — same PO + Style + Color + Size. Change Color or combine quantities.`);
+      }
+    }
+
+    return map;
+  }, [activeRows]);
+
+  /** Flat list of every issue, for the banner + issue-list card. */
+  const allIssues = useMemo(() => {
+    const list: { rowNum: number; message: string }[] = [];
+    // Include parser-level errors that aren't tied to a specific editable row
+    for (const e of parseResult.errors) {
+      list.push({ rowNum: e.row, message: `${e.field}: ${e.message}` });
+    }
+    // Add live per-row errors, using display row numbers
+    activeRows.forEach((r, i) => {
+      const rowMsgs = rowErrors.get(r.rowId) ?? [];
+      for (const m of rowMsgs) list.push({ rowNum: i + 1, message: m });
+    });
+    return list;
+  }, [parseResult.errors, activeRows, rowErrors]);
+
+  const canSave = allIssues.length === 0 && activeRows.length > 0 && !resolving;
 
   // ---- Row mutations ----
   function updateRow(rowId: string, patch: Partial<EditableRow>) {
@@ -234,13 +302,38 @@ export function PreviewTable({
             <div className="flex items-start gap-2 text-sm text-amber-700 dark:text-amber-400">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <div>
-                <p className="font-medium">{errorList.length} issue{errorList.length === 1 ? "" : "s"} need{errorList.length === 1 ? "s" : ""} fixing before save.</p>
-                <p className="mt-1 text-xs">Fix the highlighted rows below or delete them.</p>
+                <p className="font-medium">{allIssues.length} issue{allIssues.length === 1 ? "" : "s"} need{allIssues.length === 1 ? "s" : ""} fixing before save.</p>
+                <p className="mt-1 text-xs">See the issue list below, or scroll to the highlighted rows in the table.</p>
               </div>
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Issue list — always visible when there are issues, so users see the exact problems */}
+      {!resolving && allIssues.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <AlertCircle className="h-4 w-4 text-amber-500" />
+              Issue list ({allIssues.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <ul className="space-y-1 text-xs">
+              {allIssues.slice(0, 30).map((issue, i) => (
+                <li key={i} className="flex gap-2">
+                  <Badge variant="outline" className="shrink-0 font-mono text-[10px]">Row {issue.rowNum}</Badge>
+                  <span className="text-amber-900 dark:text-amber-200">{issue.message}</span>
+                </li>
+              ))}
+              {allIssues.length > 30 && (
+                <li className="italic text-muted-foreground">... +{allIssues.length - 30} more issues</li>
+              )}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
 
       {parseResult.warnings.length > 0 && (
         <Card>
@@ -268,6 +361,7 @@ export function PreviewTable({
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-12 text-center">#</TableHead>
                 <TableHead>Supplier</TableHead>
                 <TableHead>PO</TableHead>
                 <TableHead>Style</TableHead>
@@ -283,15 +377,18 @@ export function PreviewTable({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {activeRows.map((r) => {
-                const hasIssue =
-                  !r.supplierId ||
-                  !r.style || !r.color || !r.size ||
-                  !r.quantity || r.quantity <= 0 ||
-                  r.poNumbers.length === 0;
+              {activeRows.map((r, rowIdx) => {
+                const rowIssues = rowErrors.get(r.rowId) ?? [];
+                const hasIssue = rowIssues.length > 0;
                 const isEditing = editingRow === r.rowId;
+                const displayNum = rowIdx + 1;
                 return (
-                  <TableRow key={r.rowId} className={hasIssue ? "bg-amber-50/40 dark:bg-amber-950/20" : undefined}>
+                  <TableRow key={r.rowId} className={hasIssue ? "bg-amber-50/60 dark:bg-amber-950/30" : undefined}>
+                    <TableCell className="text-center align-top">
+                      <span className={`inline-flex h-6 min-w-6 items-center justify-center rounded px-1.5 font-mono text-[11px] ${hasIssue ? "bg-amber-200 font-semibold text-amber-900 dark:bg-amber-900 dark:text-amber-100" : "text-muted-foreground"}`}>
+                        {displayNum}
+                      </span>
+                    </TableCell>
                     <TableCell className="max-w-[200px]">
                       {r.supplierId ? (
                         <div>
@@ -494,10 +591,49 @@ export function PreviewTable({
                   </TableRow>
                 );
               })}
+              {/* Show per-row issue messages as a second row underneath each problem row */}
+              {/* Approach: after every problem row, render a captioning subrow spanning all cols */}
+              {/* Injecting a second row per problem is done via React fragments in the map above… */}
+              {/* …but we don't reflow. To keep DOM valid, use a rowspan-free approach: render inline errors below the last cell instead. */}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
+
+      {/* Per-row issue callouts, listed below the table so users can scan quickly */}
+      {!resolving && rowErrors.size > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Issues by row</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="space-y-3">
+              {activeRows.map((r, i) => {
+                const msgs = rowErrors.get(r.rowId) ?? [];
+                if (msgs.length === 0) return null;
+                return (
+                  <div key={r.rowId} className="flex gap-3 rounded-md border border-amber-200 bg-amber-50/60 p-3 dark:border-amber-800 dark:bg-amber-950/30">
+                    <Badge variant="outline" className="shrink-0 font-mono">Row {i + 1}</Badge>
+                    <div className="flex-1 space-y-1 text-xs">
+                      <div className="font-medium">
+                        {r.style || <span className="italic">(no style)</span>}
+                        {r.color && <> · {r.color}</>}
+                        {r.size && <> · {r.size}</>}
+                        {r.poNumbers[0] && <> · PO {r.poNumbers[0]}</>}
+                      </div>
+                      <ul className="space-y-0.5 text-amber-900 dark:text-amber-200">
+                        {msgs.map((m, j) => (
+                          <li key={j}>• {m}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Create supplier modal */}
       <Dialog open={createSupplierFor !== null} onOpenChange={(o) => !o && setCreateSupplierFor(null)}>
