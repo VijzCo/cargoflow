@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Clock, Play, Loader2, CheckCircle2, Package, Ship } from "lucide-react";
+import { Clock, Play, Loader2, CheckCircle2, Package, Ship, Split } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { POItemStatus } from "@/types";
 
@@ -12,6 +12,7 @@ const CONFIG: Record<POItemStatus, { variant: "secondary" | "info" | "warning" |
   "Completed":   { variant: "success",   icon: CheckCircle2 },
   "Loaded":      { variant: "default",   icon: Package },
   "Shipped":     { variant: "default",   icon: Ship },
+  "Split":       { variant: "secondary", icon: Split },   // CR10 — parent kept for history
 };
 
 export function StatusPill({ status }: { status: POItemStatus }) {

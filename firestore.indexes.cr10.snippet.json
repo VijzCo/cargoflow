@@ -1,0 +1,39 @@
+// ============================================================================
+// firestore.indexes.json — 3 new composite indexes for CR10
+// ============================================================================
+// Merge these into your existing firestore.indexes.json "indexes" array,
+// then run:
+//     firebase deploy --only firestore:indexes
+// ============================================================================
+
+// Index 1 — list all pending/approved/etc. splits ordered by request time.
+//           Used by the Approvals page.
+{
+  "collectionGroup": "item_split_requests",
+  "queryScope": "COLLECTION",
+  "fields": [
+    { "fieldPath": "status", "order": "ASCENDING" },
+    { "fieldPath": "requestedAt", "order": "DESCENDING" }
+  ]
+},
+
+// Index 2 — a merchant viewing only their own split requests.
+{
+  "collectionGroup": "item_split_requests",
+  "queryScope": "COLLECTION",
+  "fields": [
+    { "fieldPath": "requestedBy", "order": "ASCENDING" },
+    { "fieldPath": "requestedAt", "order": "DESCENDING" }
+  ]
+},
+
+// Index 3 — check for a pending split on a specific item.
+//           Used by getPendingSplitForItem and workflow-conflict guards.
+{
+  "collectionGroup": "item_split_requests",
+  "queryScope": "COLLECTION",
+  "fields": [
+    { "fieldPath": "itemId", "order": "ASCENDING" },
+    { "fieldPath": "status", "order": "ASCENDING" }
+  ]
+}

@@ -63,7 +63,8 @@
     "Planned": "计划中",
     "Loading": "装柜中",
     "Sailed": "已开航",
-    "Delivered": "已送达"
+    "Delivered": "已送达",
+    "Split": "已拆分"
   },
   "category": {
     "Fabric": "面料",
@@ -494,5 +495,63 @@
     "rejectToast": "已拒绝。",
     "cancelToast": "已取消。",
     "cancelConfirm": "确定取消此待审申请?"
+  },
+  "splits": {
+    "title": "拆分",
+    "requestTitle": "申请物料拆分",
+    "directTitle": "拆分物料",
+    "originalItem": "原始物料",
+    "splitInto": "拆分为 {count} 批发货",
+    "total": "合计:{sum} / {parent} {unit}",
+    "over": "超出",
+    "short": "少",
+    "addLot": "添加一批 ({current}/{max})",
+    "lot": "第 {n} 批",
+    "lotOf": "第 {n}/{total} 批",
+    "quantity": "数量",
+    "deliveryDate": "交付日期",
+    "label": "标签(可选)",
+    "labelPlaceholder": "例如:样品批",
+    "reasonCategory": "原因类别",
+    "reasonDetails": "详情",
+    "reasonPlaceholder": "补充说明(可选)",
+    "reasonPlaceholderOther": "请说明原因",
+    "reason": {
+      "supplier_capacity": "供应商产能限制",
+      "customer_early_lot": "客户需要提前批次",
+      "logistics_constraint": "物流 / 运输限制",
+      "other": "其他(下方说明)"
+    },
+    "splitNow": "立即拆分",
+    "submitApproval": "提交审批",
+    "note": "拆分将创建新物料,原物料状态标记为「已拆分」。每个新物料的 CBM 和包装数从零开始 — 供应商将在每批生产完成时重新申报。面料详情将继承到所有子物料。",
+    "toastRequested": "拆分申请已提交审批。",
+    "toastApplied": "已拆分为 {count} 个物料。",
+    "toastApproved": "拆分已批准并应用。",
+    "toastRejected": "拆分已拒绝。",
+    "toastCancelled": "拆分申请已取消。",
+    "badgeSplitParent": "已拆分 — 查看子物料",
+    "badgeSplitChild": "拆分子物料 — 不可再拆分",
+    "badgePendingByOther": "其他用户的待处理拆分",
+    "menuRequestSplit": "申请拆分",
+    "menuSplitItem": "拆分物料",
+    "menuCancelMySplit": "取消我的待处理拆分",
+    "approvals": {
+      "tabEdits": "编辑申请",
+      "tabSplits": "拆分申请",
+      "pendingSplits": "待处理拆分 ({n})",
+      "pendingSplitsDescApprover": "批准拆分将立即创建子物料。禁止自我批准。",
+      "pendingSplitsDescRequester": "等待经理或超级管理员审核。",
+      "noPendingSplits": "无待处理的拆分申请。",
+      "recentSplits": "近期已处理拆分",
+      "recentSplitsDesc": "最近 50 条已处理的拆分申请。",
+      "reviewTitle": "拆分申请",
+      "proposedSplit": "拆分方案 ({n} 批)",
+      "childrenCreated": "已创建 {n} 个子物料",
+      "approveAndApply": "批准并应用",
+      "quantitiesMustMatch": "拆分数量必须合计为 {parent}。当前为 {sum}。",
+      "reasonOtherRequired": "选择「其他」时请说明原因。",
+      "positiveQuantitiesRequired": "每个拆分必须有正数量。"
+    }
   }
 }

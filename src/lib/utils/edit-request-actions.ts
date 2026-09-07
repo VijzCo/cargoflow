@@ -60,6 +60,23 @@ function assertItemEditable(item: FirebaseFirestore.DocumentData) {
   if (item.containerId) {
     throw new Error("This item is already assigned to a container and can't be edited.");
   }
+  // CR10 — a parent that has been split is history, not editable.
+  if (item.status === "Split") {
+    throw new Error("This item has been split and can no longer be edited. Edit the child items instead.");
+  }
+}
+
+/** CR10 — one workflow at a time: block edits if a split is pending on this item. */
+async function assertNoPendingSplitOnItem(itemId: string) {
+  const snap = await adminDb
+    .collection("item_split_requests")
+    .where("itemId", "==", itemId)
+    .where("status", "==", "pending")
+    .limit(1)
+    .get();
+  if (!snap.empty) {
+    throw new Error("This item has a pending split request. Resolve it before editing.");
+  }
 }
 
 /** Pull only-changed fields by comparing proposed to current item snapshot. */
@@ -146,6 +163,7 @@ export async function submitEditRequest(input: z.infer<typeof SubmitRequestSchem
   if (!itemSnap.exists) throw new Error("Item not found.");
   const item = itemSnap.data()!;
   assertItemEditable(item);
+  await assertNoPendingSplitOnItem(data.itemId);
 
   // Reject if user is a supplier somehow (shouldn't reach here, but defense-in-depth)
   if (user.role === "supplier" || user.role === "viewer") {
@@ -396,6 +414,7 @@ export async function editItemDirect(input: z.infer<typeof DirectEditSchema>) {
   if (!itemSnap.exists) throw new Error("Item not found.");
   const item = itemSnap.data()!;
   assertItemEditable(item);
+  await assertNoPendingSplitOnItem(data.itemId);
 
   const proposed = data.changes as Record<string, unknown>;
   const { changes, previous } = changedFieldsOnly(item, proposed);
@@ -426,6 +445,7 @@ export async function deleteItemDirect(itemId: string) {
   if (!itemSnap.exists) throw new Error("Item not found.");
   const item = itemSnap.data()!;
   assertItemEditable(item);
+  await assertNoPendingSplitOnItem(itemId);
 
   await itemRef.delete();
   await writeActivityLog({

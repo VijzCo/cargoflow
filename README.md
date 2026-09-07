@@ -1,199 +1,126 @@
-# CargoFlow
+# CR10 Wiring Patch — makes the Split option actually appear
 
-Smart consignment & container tracking platform for global sourcing operations.
+## What this patch fixes
 
-Built with **Next.js 15 (App Router) + TypeScript + Tailwind + Firebase**.
+The main CR10 zip added `<ItemActions>` with new props for split, but those
+props defaulted to `false`/`null` unless the pages rendering `<ItemActions>`
+pass them in. This patch does that wiring.
 
----
+Plus fixes two TypeScript errors that CR10 introduces (Split status is a new
+enum value, and one strict `Record<POItemStatus, ...>` map didn't cover it).
 
-## What's in this Foundation (Chunk 1)
+## Files in this patch
 
-This release ships the production-grade shell of the app. It runs, authenticates, gates routes by role, and renders a branded UI in both light and dark modes. Business modules (PO upload, container allocation, packing lists, reports) build on top of it in Chunks 2-6.
+| File | Type | Notes |
+|------|------|-------|
+| `src/app/(app)/purchase-orders/[poId]/page.tsx` | REPLACE | Wires split perms + pending-split fetch into the PO detail page. Also adds "Lot N/M · label" badge on split-child rows and "Pending split" badge on rows awaiting approval. Handles new "Split" status in `StatusCell`. |
+| `src/app/(app)/production/page.tsx` | REPLACE | Adds `canSplitDirect`/`canSplitRequest` perms and passes them to `ProductionClient`. |
+| `src/components/production/status-pill.tsx` | REPLACE | Adds `Split` status to the strict CONFIG map (else TypeScript build fails). |
+| `MESSAGES_TWO_LINE_EDIT.txt` | ACTION | Just add one line to `messages/en.json` and one line to `messages/zh.json` — see file for exact text. |
 
-**Included:**
+## What you still need to do MANUALLY
 
-- Next.js 15 App Router with route groups and middleware
-- Firebase Auth (email + password, password reset email, HTTP-only session cookies)
-- Firestore client SDK + Admin SDK wiring
-- Five-role RBAC: `super_admin`, `merchant`, `supplier`, `logistics`, `viewer`
-- Permission map in `src/lib/rbac/permissions.ts` — single source of truth for what each role can do
-- Firestore security rules enforcing role-based access AND supplier isolation
-- Composite Firestore indexes for the queries we'll run
-- Branded login + password-reset screens (Framer Motion, gradient blob backgrounds)
-- App shell: collapsible sidebar (role-aware menu), topbar with user menu, dark mode toggle
-- TypeScript types for all Firestore collections in `src/types/index.ts`
-- Bootstrap script to create the first super_admin user
-- Settings seed script (sales channels + category keywords)
+### 1. Update `ProductionClient` (the client-side file next to the production page)
 
-**Not included yet (next chunks):**
+I didn't touch `src/app/(app)/production/production-client.tsx` — I don't have that file. You need to add two props to its signature and pass them down to `<ItemActions>`.
 
-- Chunk 2: PO upload module (parser is already done — `poParser.ts`)
-- Chunk 3: Production tracking + supplier CBM entry
-- Chunk 4: Container allocation (auto + manual) + vessel management
-- Chunk 5: Packing list generator + PDF export
-- Chunk 6: Reports, audit log UI, admin pages (users / suppliers / settings)
-
----
-
-## Setup
-
-### 1. Install dependencies
-
-```bash
-npm install
+Open it, find the current props interface:
+```typescript
+export function ProductionClient({
+  role,
+  supplierId,
+  suppliers,
+  currentUserId,
+  canEditDirect,
+  canEditRequest,
+}: { ... })
 ```
 
-### 2. Create a Firebase project
-
-1. Go to <https://console.firebase.google.com> and create a new project.
-2. Enable **Authentication** → **Email/Password** provider.
-3. Enable **Firestore Database** (in production mode).
-4. Project Settings → General → **Your apps** → add a Web app. Copy the config values.
-5. Project Settings → **Service accounts** → **Generate new private key**. A JSON file downloads — keep it safe.
-
-### 3. Environment variables
-
-Copy `.env.example` to `.env.local` and fill in:
-
-- The 6 `NEXT_PUBLIC_FIREBASE_*` values from the web-app config.
-- `FIREBASE_ADMIN_PROJECT_ID`, `FIREBASE_ADMIN_CLIENT_EMAIL`, `FIREBASE_ADMIN_PRIVATE_KEY` from the service-account JSON (`project_id`, `client_email`, `private_key`).
-
-### 4. Deploy Firestore rules + indexes
-
-Install Firebase CLI once: `npm install -g firebase-tools`, then:
-
-```bash
-firebase login
-firebase use --add        # select your project
-npm run deploy:rules      # deploys firestore.rules + indexes
+Add these two props (both in the type and the destructuring):
+```typescript
+canSplitDirect: boolean;
+canSplitRequest: boolean;
 ```
 
-### 5. Bootstrap the first super_admin
-
-This solves the chicken-and-egg problem (rules require an admin to create users, but there's no admin yet).
-
-Add these to `.env.local`:
-
-```env
-BOOTSTRAP_ADMIN_EMAIL=you@yourcompany.com
-BOOTSTRAP_ADMIN_NAME="Your Name"
+Then find the `<ItemActions ... />` call inside the component's JSX (near where it renders each item row). Currently it looks something like:
+```tsx
+<ItemActions
+  item={item}
+  canUpdateStatus={canUpdateStatus}
+  canUpdateCBM={canUpdateCBM}
+  isSupplier={isSupplier}
+  canEditDirect={canEditDirect}
+  canEditRequest={canEditRequest}
+  pendingRequest={pendingMap.get(item.id) ?? null}
+  currentUserId={currentUserId}
+/>
 ```
 
-Then run:
-
-```bash
-node --env-file=.env.local scripts/bootstrap-admin.mjs
+Add three lines:
+```tsx
+<ItemActions
+  item={item}
+  canUpdateStatus={canUpdateStatus}
+  canUpdateCBM={canUpdateCBM}
+  isSupplier={isSupplier}
+  canEditDirect={canEditDirect}
+  canEditRequest={canEditRequest}
+  pendingRequest={pendingMap.get(item.id) ?? null}
+  canSplitDirect={canSplitDirect}          // NEW
+  canSplitRequest={canSplitRequest}        // NEW
+  pendingSplit={pendingSplitMap.get(item.id) ?? null}   // NEW
+  currentUserId={currentUserId}
+/>
 ```
 
-The script:
-1. Creates a Firebase Auth user with that email.
-2. Writes a Firestore user doc with `role: "super_admin"`, `active: true`.
-3. Generates a password-reset link and prints it to the console.
+You will ALSO need a `pendingSplitMap` in `ProductionClient` similar to your existing `pendingMap`. If you're using `listPendingForItems` from `edit-request-actions`, add a parallel call to `listPendingSplitsForItems` from `split-actions`:
 
-**Open the printed link in a browser to set your password.** Now you can sign in.
+```typescript
+import { listPendingSplitsForItems } from "@/lib/utils/split-actions";
 
-### 6. Seed defaults
-
-```bash
-node --env-file=.env.local scripts/seed-settings.mjs
+// wherever pending edits are fetched:
+const [pendingEdits, pendingSplits] = await Promise.all([
+  listPendingForItems(itemIds),
+  listPendingSplitsForItems(itemIds),
+]);
+// build both maps and pass into rows
 ```
 
-Writes:
-- `settings/global` doc with brand defaults, 92% usable CBM, and category keyword lists.
-- Six default `sales_channels` (Amazon, Walmart, Retail, Wholesale, Shopify, TikTok Shop).
+If ProductionClient is fully client-side and does the fetch differently, follow
+whatever pattern it uses for `pendingMap` — just add the parallel one.
 
-### 7. Run
+**Send me `production-client.tsx` if you want me to patch it precisely.** I did
+not have that file. Same approach as PO detail — two indexed queries in parallel,
+build maps, pass into ItemActions.
 
-```bash
-npm run dev
+### 2. Add the two message keys
+
+See `MESSAGES_TWO_LINE_EDIT.txt` — one line each in `en.json` and `zh.json`
+under the existing `"status"` object.
+
+### 3. Deploy
+
+Standard drill:
+
+```powershell
+cd C:\xampp\htdocs\MAS_projects\locdev\cargoflow
+Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue
+npm run build
 ```
 
-Visit `http://localhost:3000`, sign in with the email and password from steps 5-6.
+If build passes → push. If build fails → paste the TS errors and I'll patch.
 
----
+## Testing after deploy
 
-## Deploying to production
+Log in as different roles and open a PO detail page with items that have
+status `Pending`, `Started`, `In Progress`, or `Completed`:
 
-### Option A: Vercel (recommended for Next.js)
+- **super_admin** — three-dot menu shows "Split item" (applies immediately)
+- **merchant_manager** — three-dot menu shows "Split item" (applies immediately)
+- **merchant** — three-dot menu shows "Request split" (goes for approval)
+- **supplier** — no split option (as designed)
+- **logistics / viewer** — no split option (as designed)
 
-```bash
-npm install -g vercel
-vercel
-```
-
-Set the same env vars in the Vercel dashboard. For `FIREBASE_ADMIN_PRIVATE_KEY`, paste the whole multi-line value — Vercel will escape it correctly.
-
-### Option B: Firebase Hosting + Cloud Functions
-
-Firebase Hosting alone can't run Next.js App Router with server actions. You need Cloud Functions for SSR. Vercel is simpler unless you have a hard requirement to keep everything in Firebase.
-
----
-
-## Project structure
-
-```
-src/
-├── app/
-│   ├── (app)/                    # Authenticated route group
-│   │   ├── layout.tsx            # Sidebar + topbar shell
-│   │   ├── dashboard/
-│   │   ├── purchase-orders/      # placeholder — Chunk 2
-│   │   ├── production/           # placeholder — Chunk 3
-│   │   ├── containers/           # placeholder — Chunk 4
-│   │   ├── vessels/              # placeholder — Chunk 4
-│   │   ├── packing-lists/        # placeholder — Chunk 5
-│   │   ├── reports/              # placeholder — Chunk 6
-│   │   └── admin/
-│   │       ├── users/            # placeholder — Chunk 6
-│   │       ├── suppliers/        # placeholder — Chunk 2
-│   │       ├── settings/         # placeholder — Chunk 6
-│   │       └── activity/         # placeholder — Chunk 6
-│   ├── login/page.tsx
-│   ├── reset-password/page.tsx
-│   ├── api/auth/session/route.ts # session cookie endpoint
-│   └── layout.tsx                # root layout (providers)
-├── components/
-│   ├── auth/                     # AuthProvider, <Can> gate
-│   ├── layout/                   # Sidebar, Topbar, ModulePlaceholder
-│   └── ui/                       # ShadCN-style primitives
-├── lib/
-│   ├── firebase/                 # client.ts, admin.ts, collections.ts
-│   ├── rbac/                     # permissions.ts, session.ts
-│   └── utils/                    # cn, formatters
-├── types/                        # Domain types (UserDoc, POItemDoc, etc.)
-└── middleware.ts                 # Edge-level cookie gate
-scripts/
-├── bootstrap-admin.mjs           # one-time: create first super_admin
-└── seed-settings.mjs             # idempotent: defaults + sales channels
-firestore.rules                   # RBAC + supplier isolation
-firestore.indexes.json
-```
-
----
-
-## How RBAC works (read this once)
-
-There are three layers of access control:
-
-1. **Middleware (`src/middleware.ts`)** — fast edge-level check: is there a session cookie? If not, redirect to `/login`. Doesn't validate the cookie deeply — that's expensive and the next layers catch it anyway.
-
-2. **Server-side page guards** — every page (or layout) that needs auth calls `getSessionUser()` from `src/lib/rbac/session.ts`. This verifies the session cookie, loads the user doc, and checks `active === true`. If not authenticated, redirect to login.
-
-3. **Firestore security rules (`firestore.rules`)** — the actual data shield. Even if someone bypasses the UI, Firestore enforces role + supplier isolation at the database level. Suppliers can only read their own `po_items` (filtered by `supplierId`), can only update specific fields (status/CBM/remarks), and so on.
-
-The client-side `<Can permission="...">` component is for UX (hiding buttons users can't use), NOT for security. Real enforcement is in layers 2 and 3.
-
----
-
-## Adding the PO parser (already built)
-
-`poParser.ts` (delivered separately) goes into `src/lib/poParser.ts`. It's already TypeScript and uses `xlsx` (already in package.json). Chunk 2 wires it into the upload UI.
-
----
-
-## Troubleshooting
-
-- **"Firebase Admin env vars missing"** — make sure `.env.local` exists and you ran scripts with `node --env-file=.env.local`.
-- **"PRIVATE KEY parse error"** — your `FIREBASE_ADMIN_PRIVATE_KEY` is probably missing newline characters. Either paste the raw multi-line PEM value, or escape newlines as `\n` literals.
-- **Sign-in works but the page just reloads to /login** — the session cookie isn't being set. Check that `secure: process.env.NODE_ENV === "production"` matches your dev URL (localhost should be `http://`, not `https://`).
-- **"Missing or insufficient permissions" in Firestore** — you probably haven't deployed the rules. Run `npm run deploy:rules`.
+Then try items with status `Loaded` or `Shipped` — split option should be
+hidden entirely (item is locked). And items already with status `Split` should
+show only the informational "Already split — see child items" line.

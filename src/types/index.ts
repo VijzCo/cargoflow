@@ -74,7 +74,8 @@ export type POItemStatus =
   | "In Progress"
   | "Completed"
   | "Loaded"
-  | "Shipped";
+  | "Shipped"
+  | "Split";               // CR10 — parent has been split into children; no longer active
 
 export interface PurchaseOrderDoc {
   id: string;
@@ -139,6 +140,17 @@ export interface POItemDoc {
   containerId?: string;
   vesselId?: string;
   packingListId?: string;
+
+  // CR10 — split lineage. When present, this item is either a parent that
+  // has been split (status === "Split") or a child produced by a split.
+  splitFromItemId?: string;       // parent item's id (children only)
+  splitGroupId?: string;          // shared across all siblings (children)
+  splitIndex?: number;            // 1-based position among siblings (children)
+  splitTotal?: number;            // total siblings in the group (children)
+  splitLabel?: string;            // optional human-readable label (e.g. "Sampling batch")
+  splitChildIds?: string[];       // parent only: ids of the child items produced
+  splitAt?: Timestamp | null;     // when the split was applied
+  splitBy?: string;               // uid of user who applied the split
 
   createdAt: Timestamp | null;
   updatedAt: Timestamp | null;
@@ -286,7 +298,13 @@ export type ActivityAction =
   | "item.delete_requested"      // merchant submitted a delete request
   | "item.request_approved"      // approver approved
   | "item.request_rejected"      // approver rejected
-  | "item.request_cancelled";    // merchant cancelled their own pending request
+  | "item.request_cancelled"     // merchant cancelled their own pending request
+  // CR10 — split workflow
+  | "item.split_requested"       // merchant submitted a split request
+  | "item.split_approved"        // approver approved a split request (and applied it)
+  | "item.split_rejected"        // approver rejected a split request
+  | "item.split_cancelled"       // merchant cancelled their own pending split request
+  | "item.split_applied_direct"; // manager/admin split directly without approval
 
 export interface ActivityLogDoc {
   id: string;
@@ -337,4 +355,59 @@ export interface ItemEditRequestDoc {
   resolvedByEmail?: string;
   resolvedAt?: Timestamp | null;
   resolverNote?: string;          // approver/rejector comment
+}
+
+// =============================================================================
+// Item split requests (CR10 — partial-shipment splits, approval workflow)
+// =============================================================================
+
+/** Predefined reason categories for a split, for reporting / analytics. */
+export type SplitReasonCategory =
+  | "supplier_capacity"
+  | "customer_early_lot"
+  | "logistics_constraint"
+  | "other";
+
+/** Definition of a single child produced by a split. */
+export interface SplitChildInput {
+  quantity: number;
+  deliveryDate?: string;          // ISO yyyy-mm-dd; defaults to parent's date
+  label?: string;                 // optional short label like "Sampling batch"
+}
+
+/** Snapshot of a fully-planned split (used inside a request or by direct apply). */
+export interface SplitPlan {
+  children: SplitChildInput[];
+  reasonCategory: SplitReasonCategory;
+  reasonText?: string;
+}
+
+export interface ItemSplitRequestDoc {
+  id: string;
+  itemId: string;                 // parent POItemDoc.id
+  poId: string;
+  supplierId: string;             // copied at request time for RBAC isolation
+  status: EditRequestStatus;      // reuse the same lifecycle: pending / approved / rejected / cancelled
+
+  plan: SplitPlan;                // the proposed split
+  parentSnapshot: {               // captured at request time for audit / diffing
+    style: string;
+    color: string;
+    size: string;
+    quantity: number;
+    unit: string;
+    deliveryDate?: string;
+  };
+
+  requestedBy: string;
+  requestedByEmail: string;
+  requestedAt: Timestamp | null;
+
+  resolvedBy?: string;
+  resolvedByEmail?: string;
+  resolvedAt?: Timestamp | null;
+  resolverNote?: string;
+
+  // Populated after status becomes "approved" — ids of newly-created child items
+  createdChildIds?: string[];
 }

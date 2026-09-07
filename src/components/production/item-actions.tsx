@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
-import { Pencil, Boxes, MoreVertical, Send, AlertTriangle, Trash2, X, Loader2 } from "lucide-react";
+import { Pencil, Boxes, MoreVertical, Send, AlertTriangle, Trash2, X, Loader2, Split } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -12,9 +12,11 @@ import {
 import { StatusUpdateDialog } from "./status-update-dialog";
 import { CBMUpdateDialog } from "./cbm-update-dialog";
 import { EditItemDialog } from "@/components/po/edit-item-dialog";
+import { SplitItemDialog } from "@/components/po/split-item-dialog";
 import {
   deleteItemDirect, submitEditRequest, cancelEditRequest,
 } from "@/lib/utils/edit-request-actions";
+import { cancelSplitRequest } from "@/lib/utils/split-actions";
 import type { POItemView } from "@/lib/utils/po-item-view";
 import type { POItemStatus } from "@/types";
 
@@ -27,6 +29,11 @@ interface PendingRequestLite {
   requestedBy: string;
 }
 
+interface PendingSplitLite {
+  id: string;
+  requestedBy: string;
+}
+
 export function ItemActions({
   item,
   canUpdateStatus,
@@ -36,6 +43,10 @@ export function ItemActions({
   canEditDirect = false,
   canEditRequest = false,
   pendingRequest = null,
+  // CR10 — split workflow
+  canSplitDirect = false,
+  canSplitRequest = false,
+  pendingSplit = null,
   currentUserId,
 }: {
   item: POItemView;
@@ -45,6 +56,9 @@ export function ItemActions({
   canEditDirect?: boolean;
   canEditRequest?: boolean;
   pendingRequest?: PendingRequestLite | null;
+  canSplitDirect?: boolean;
+  canSplitRequest?: boolean;
+  pendingSplit?: PendingSplitLite | null;
   currentUserId?: string;
 }) {
   const router = useRouter();
@@ -52,26 +66,47 @@ export function ItemActions({
   const [statusOpen, setStatusOpen] = useState(false);
   const [cbmOpen, setCbmOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [splitOpen, setSplitOpen] = useState(false);
   const [working, startWork] = useTransition();
 
   const allowedStatuses = isSupplier ? SUPPLIER_STATUSES : MERCHANT_STATUSES;
   const itemLabel = `${item.style} — ${item.color} (${item.size})`;
 
-  // Items in a container can't be edited or deleted through this flow
+  // Items in a container can't be edited/split through this flow
   const lockedByContainer =
     item.status === "Loaded" || item.status === "Shipped" || !!item.containerId;
-  const hasPending = !!pendingRequest;
-  const isMyPending = pendingRequest?.requestedBy === currentUserId;
+  // A parent that's been split is history — no further actions
+  const isSplitParent = item.status === "Split";
+  // Children of a split cannot be split further (one level only for v1)
+  const isSplitChild = !!(item as unknown as { splitFromItemId?: string }).splitFromItemId;
 
-  // Edit button visible only when user has edit perm AND item isn't locked
-  const showEditOption = (canEditDirect || canEditRequest) && !lockedByContainer && !hasPending;
-  const showDeleteOption = (canEditDirect || canEditRequest) && !lockedByContainer && !hasPending;
-  const showCancelOption = hasPending && isMyPending;
+  const hasPendingEdit = !!pendingRequest;
+  const isMyPendingEdit = pendingRequest?.requestedBy === currentUserId;
+  const hasPendingSplit = !!pendingSplit;
+  const isMyPendingSplit = pendingSplit?.requestedBy === currentUserId;
+
+  // Edit visibility — same logic as CR9, plus no pending split, plus not a split parent
+  const canDoEditWorkflow = canEditDirect || canEditRequest;
+  const showEditOption = canDoEditWorkflow && !lockedByContainer && !hasPendingEdit && !hasPendingSplit && !isSplitParent;
+  const showDeleteOption = canDoEditWorkflow && !lockedByContainer && !hasPendingEdit && !hasPendingSplit && !isSplitParent;
+  const showCancelEdit = hasPendingEdit && isMyPendingEdit;
+
+  // Split visibility — split perms, item is splittable, no other pending workflow
+  const canDoSplitWorkflow = canSplitDirect || canSplitRequest;
+  const showSplitOption = canDoSplitWorkflow && !lockedByContainer && !hasPendingEdit && !hasPendingSplit && !isSplitParent && !isSplitChild;
+  const showCancelSplit = hasPendingSplit && isMyPendingSplit;
 
   const editMode: "direct" | "request" = canEditDirect ? "direct" : "request";
+  const splitMode: "direct" | "request" = canSplitDirect ? "direct" : "request";
 
   const hasAnyAction =
-    canUpdateStatus || canUpdateCBM || showEditOption || showDeleteOption || showCancelOption;
+    canUpdateStatus || canUpdateCBM ||
+    showEditOption || showDeleteOption || showCancelEdit ||
+    showSplitOption || showCancelSplit ||
+    (hasPendingEdit && !isMyPendingEdit) ||
+    (hasPendingSplit && !isMyPendingSplit) ||
+    (lockedByContainer && canDoEditWorkflow) ||
+    isSplitParent || isSplitChild;
   if (!hasAnyAction) return null;
 
   function handleDelete() {
@@ -96,13 +131,27 @@ export function ItemActions({
     });
   }
 
-  function handleCancelPending() {
+  function handleCancelEdit() {
     if (!pendingRequest) return;
-    if (!confirm("Cancel your pending request on this item?")) return;
+    if (!confirm("Cancel your pending edit request on this item?")) return;
     startWork(async () => {
       try {
         await cancelEditRequest(pendingRequest.id);
-        toast.success("Request cancelled.");
+        toast.success("Edit request cancelled.");
+        router.refresh();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed.");
+      }
+    });
+  }
+
+  function handleCancelSplit() {
+    if (!pendingSplit) return;
+    if (!confirm("Cancel your pending split request on this item?")) return;
+    startWork(async () => {
+      try {
+        await cancelSplitRequest(pendingSplit.id);
+        toast.success("Split request cancelled.");
         router.refresh();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Failed.");
@@ -129,9 +178,13 @@ export function ItemActions({
               <Boxes className="mr-2 h-3.5 w-3.5" /> {t("updateCBM")}
             </DropdownMenuItem>
           )}
-          {(showEditOption || showDeleteOption || showCancelOption) && (canUpdateStatus || canUpdateCBM) && (
+
+          {/* Separator between supplier-y actions and merchant-y actions */}
+          {(showEditOption || showDeleteOption || showSplitOption ||
+            showCancelEdit || showCancelSplit) && (canUpdateStatus || canUpdateCBM) && (
             <DropdownMenuSeparator />
           )}
+
           {showEditOption && (
             <DropdownMenuItem onClick={() => setEditOpen(true)} disabled={working}>
               {editMode === "direct" ? (
@@ -141,25 +194,61 @@ export function ItemActions({
               )}
             </DropdownMenuItem>
           )}
+          {showSplitOption && (
+            <DropdownMenuItem onClick={() => setSplitOpen(true)} disabled={working}>
+              {splitMode === "direct" ? (
+                <><Split className="mr-2 h-3.5 w-3.5" /> Split item</>
+              ) : (
+                <><Split className="mr-2 h-3.5 w-3.5" /> Request split</>
+              )}
+            </DropdownMenuItem>
+          )}
           {showDeleteOption && (
             <DropdownMenuItem onClick={handleDelete} disabled={working}>
               <Trash2 className="mr-2 h-3.5 w-3.5" />
               {canEditDirect ? "Delete item" : "Request delete"}
             </DropdownMenuItem>
           )}
-          {showCancelOption && (
-            <DropdownMenuItem onClick={handleCancelPending} disabled={working}>
+
+          {showCancelEdit && (
+            <DropdownMenuItem onClick={handleCancelEdit} disabled={working}>
               {working ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <X className="mr-2 h-3.5 w-3.5" />}
-              Cancel my pending request
+              Cancel my pending edit
             </DropdownMenuItem>
           )}
-          {hasPending && !isMyPending && (
+          {showCancelSplit && (
+            <DropdownMenuItem onClick={handleCancelSplit} disabled={working}>
+              {working ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <X className="mr-2 h-3.5 w-3.5" />}
+              Cancel my pending split
+            </DropdownMenuItem>
+          )}
+
+          {/* Informational disabled entries */}
+          {hasPendingEdit && !isMyPendingEdit && (
             <DropdownMenuItem disabled>
               <AlertTriangle className="mr-2 h-3.5 w-3.5 text-amber-500" />
-              Pending change by another user
+              Pending edit by another user
             </DropdownMenuItem>
           )}
-          {lockedByContainer && (canEditDirect || canEditRequest) && (
+          {hasPendingSplit && !isMyPendingSplit && (
+            <DropdownMenuItem disabled>
+              <AlertTriangle className="mr-2 h-3.5 w-3.5 text-amber-500" />
+              Pending split by another user
+            </DropdownMenuItem>
+          )}
+          {isSplitParent && (
+            <DropdownMenuItem disabled>
+              <Split className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
+              Already split — see child items
+            </DropdownMenuItem>
+          )}
+          {isSplitChild && canDoSplitWorkflow && !isSplitParent && (
+            <DropdownMenuItem disabled>
+              <AlertTriangle className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
+              Split child — cannot split again
+            </DropdownMenuItem>
+          )}
+          {lockedByContainer && canDoEditWorkflow && (
             <DropdownMenuItem disabled>
               <AlertTriangle className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
               Locked — in container
@@ -207,6 +296,25 @@ export function ItemActions({
             deliveryDate: item.deliveryDate,
             salesChannel: item.salesChannel,
             remarks: item.remarks,
+            status: item.status,
+          }}
+        />
+      )}
+
+      {showSplitOption && (
+        <SplitItemDialog
+          mode={splitMode}
+          open={splitOpen}
+          onOpenChange={setSplitOpen}
+          item={{
+            id: item.id,
+            poId: item.poId,
+            style: item.style,
+            color: item.color,
+            size: item.size,
+            quantity: item.quantity,
+            unit: item.unit,
+            deliveryDate: item.deliveryDate,
             status: item.status,
           }}
         />

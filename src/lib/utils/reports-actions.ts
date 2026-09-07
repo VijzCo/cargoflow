@@ -22,8 +22,10 @@ export type ReportData = {
   recentVessels: { id: string; vesselId: string; destination: string; status: string; etd?: string }[];
 };
 
+
+
 const ZERO_STATUS: Record<POItemStatus, number> = {
-  "Pending": 0, "Started": 0, "In Progress": 0, "Completed": 0, "Loaded": 0, "Shipped": 0,
+  "Pending": 0, "Started": 0, "In Progress": 0, "Completed": 0, "Loaded": 0, "Shipped": 0, "Split": 0,
 };
 
 const ZERO_CATEGORY: Record<Category, { count: number; cbm: number }> = {

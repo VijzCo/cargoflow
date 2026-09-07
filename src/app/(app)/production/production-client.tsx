@@ -8,7 +8,7 @@ import {
   type QueryConstraint,
 } from "firebase/firestore";
 import {
-  Loader2, Factory, Clock, CheckCircle2, AlertTriangle, ExternalLink, Search,
+  Loader2, Factory, Clock, CheckCircle2, AlertTriangle, ExternalLink, Search, Split,
 } from "lucide-react";
 import { db } from "@/lib/firebase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,12 +21,13 @@ import {
 import { StatusPill } from "@/components/production/status-pill";
 import { ItemActions } from "@/components/production/item-actions";
 import { listPendingForItems } from "@/lib/utils/edit-request-actions";
+import { listPendingSplitsForItems } from "@/lib/utils/split-actions";
 import { formatNumber, formatDate, formatCBM } from "@/lib/utils/format";
 import { hasPermission } from "@/lib/rbac/permissions";
 import type { Role, POItemStatus } from "@/types";
 import type { POItemView } from "@/lib/utils/po-item-view";
 
-const STATUSES: POItemStatus[] = ["Pending", "Started", "In Progress", "Completed", "Loaded", "Shipped"];
+const STATUSES: POItemStatus[] = ["Pending", "Started", "In Progress", "Completed", "Loaded", "Shipped", "Split"];
 const ALL = "_all";
 
 export function ProductionClient({
@@ -36,6 +37,9 @@ export function ProductionClient({
   currentUserId,
   canEditDirect = false,
   canEditRequest = false,
+  // CR10 — split workflow perms
+  canSplitDirect = false,
+  canSplitRequest = false,
 }: {
   role: Role;
   supplierId?: string;
@@ -43,21 +47,22 @@ export function ProductionClient({
   currentUserId?: string;
   canEditDirect?: boolean;
   canEditRequest?: boolean;
+  canSplitDirect?: boolean;
+  canSplitRequest?: boolean;
 }) {
   const isSupplier = role === "supplier";
-
   const [items, setItems] = useState<POItemView[]>([]);
   const [loading, setLoading] = useState(true);
   const [supplierFilter, setSupplierFilter] = useState<string>(isSupplier ? supplierId ?? ALL : ALL);
   const [statusFilter, setStatusFilter] = useState<string>(ALL);
   const [search, setSearch] = useState("");
   const [pendingMap, setPendingMap] = useState<Map<string, { id: string; type: "update" | "delete"; requestedBy: string }>>(new Map());
+  const [pendingSplitMap, setPendingSplitMap] = useState<Map<string, { id: string; requestedBy: string }>>(new Map());
 
   // ---- Real-time subscription ----
   useEffect(() => {
     setLoading(true);
     const constraints: QueryConstraint[] = [];
-
     if (isSupplier && supplierId) {
       constraints.push(where("supplierId", "==", supplierId));
     } else if (supplierFilter !== ALL) {
@@ -68,7 +73,6 @@ export function ProductionClient({
     }
     constraints.push(orderBy("updatedAt", "desc"));
     constraints.push(limit(300));
-
     const q = query(collection(db, "po_items"), ...constraints);
     const unsub = onSnapshot(
       q,
@@ -100,8 +104,15 @@ export function ProductionClient({
             supplierRemarks: data.supplierRemarks,
             containerId: data.containerId,
             vesselId: data.vesselId,
+            // CR10 — split lineage carried through so the UI can render badges + logic
+            splitFromItemId: data.splitFromItemId,
+            splitGroupId: data.splitGroupId,
+            splitIndex: data.splitIndex,
+            splitTotal: data.splitTotal,
+            splitLabel: data.splitLabel,
+            splitChildIds: data.splitChildIds,
             updatedAt: data.updatedAt?.toDate?.()?.toISOString() ?? null,
-          };
+          } as POItemView;
         });
         setItems(next);
         setLoading(false);
@@ -111,22 +122,31 @@ export function ProductionClient({
         setLoading(false);
       },
     );
-
     return unsub;
   }, [isSupplier, supplierId, supplierFilter, statusFilter]);
 
-  // ---- Fetch pending requests for currently visible items ----
+  // ---- Fetch pending edit AND split requests for currently visible items ----
   useEffect(() => {
     if (isSupplier || items.length === 0) {
       setPendingMap(new Map());
+      setPendingSplitMap(new Map());
       return;
     }
     let cancelled = false;
-    listPendingForItems(items.map((i) => i.id)).then((map) => {
+    const ids = items.map((i) => i.id);
+    Promise.all([
+      listPendingForItems(ids),
+      listPendingSplitsForItems(ids),
+    ]).then(([edits, splits]) => {
       if (cancelled) return;
-      const next = new Map<string, { id: string; type: "update" | "delete"; requestedBy: string }>();
-      for (const [k, v] of Object.entries(map)) next.set(k, v);
-      setPendingMap(next);
+
+      const nextEdits = new Map<string, { id: string; type: "update" | "delete"; requestedBy: string }>();
+      for (const [k, v] of Object.entries(edits)) nextEdits.set(k, v);
+      setPendingMap(nextEdits);
+
+      const nextSplits = new Map<string, { id: string; requestedBy: string }>();
+      for (const [k, v] of Object.entries(splits)) nextSplits.set(k, v);
+      setPendingSplitMap(nextSplits);
     }).catch(() => {});
     return () => { cancelled = true; };
   }, [isSupplier, items]);
@@ -154,7 +174,7 @@ export function ProductionClient({
     const today = new Date().toISOString().slice(0, 10);
     const overdue = items.filter(
       (i) => i.deliveryDate && i.deliveryDate < today &&
-            i.status !== "Completed" && i.status !== "Loaded" && i.status !== "Shipped",
+            i.status !== "Completed" && i.status !== "Loaded" && i.status !== "Shipped" && i.status !== "Split",
     ).length;
     const noCbm = items.filter(
       (i) => (i.status === "Completed" || i.status === "In Progress") && i.cbm === 0,
@@ -177,7 +197,6 @@ export function ProductionClient({
           {isSupplier ? t("subtitleSupplier") : t("subtitleAdmin")}
         </p>
       </div>
-
       <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5">
         <KPI label={t("kpiTotal")} value={kpi.total} icon={Factory} />
         <KPI label={t("kpiPending")} value={kpi.pending} icon={Clock} accent="amber" />
@@ -185,7 +204,6 @@ export function ProductionClient({
         <KPI label={t("kpiCompleted")} value={kpi.completed} icon={CheckCircle2} accent="emerald" />
         <KPI label={t("kpiOverdue")} value={kpi.overdue} icon={AlertTriangle} accent="rose" />
       </div>
-
       {kpi.noCbm > 0 && !isSupplier && (
         <Card>
           <CardContent className="flex items-center gap-2 p-3 text-sm">
@@ -194,7 +212,6 @@ export function ProductionClient({
           </CardContent>
         </Card>
       )}
-
       <Card>
         <CardContent className="space-y-3 p-3">
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -207,7 +224,6 @@ export function ProductionClient({
                 className="pl-9"
               />
             </div>
-
             {!isSupplier && (
               <Select value={supplierFilter} onValueChange={setSupplierFilter}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -219,7 +235,6 @@ export function ProductionClient({
                 </SelectContent>
               </Select>
             )}
-
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -230,7 +245,6 @@ export function ProductionClient({
           </div>
         </CardContent>
       </Card>
-
       <Card>
         <CardContent className="p-0">
           {loading ? (
@@ -262,7 +276,15 @@ export function ProductionClient({
                 {filtered.map((item) => {
                   const today = new Date().toISOString().slice(0, 10);
                   const overdue = item.deliveryDate && item.deliveryDate < today &&
-                    item.status !== "Completed" && item.status !== "Loaded" && item.status !== "Shipped";
+                    item.status !== "Completed" && item.status !== "Loaded" && item.status !== "Shipped" && item.status !== "Split";
+                  // CR10 — read split-lineage fields; supplier gets a friendly "Lot N/M" badge on child rows.
+                  const asItem = item as unknown as {
+                    splitFromItemId?: string;
+                    splitIndex?: number;
+                    splitTotal?: number;
+                    splitLabel?: string;
+                  };
+                  const isSplitChild = !!asItem.splitFromItemId;
                   return (
                     <TableRow key={item.id} className={overdue ? "bg-rose-50/40 dark:bg-rose-950/20" : undefined}>
                       <TableCell>
@@ -274,7 +296,20 @@ export function ProductionClient({
                       {!isSupplier && (
                         <TableCell className="max-w-[180px] truncate text-sm">{item.supplierName}</TableCell>
                       )}
-                      <TableCell className="max-w-[180px] truncate text-sm">{item.style}</TableCell>
+                      <TableCell className="max-w-[180px] truncate text-sm">
+                        {item.style}
+                        {isSplitChild && asItem.splitIndex && asItem.splitTotal && (
+                          <div className="mt-0.5 flex items-center gap-1">
+                            <Badge variant="outline" className="text-[10px]">
+                              <Split className="mr-0.5 h-2.5 w-2.5" />
+                              Lot {asItem.splitIndex}/{asItem.splitTotal}
+                            </Badge>
+                            {asItem.splitLabel && (
+                              <span className="text-[10px] text-muted-foreground">· {asItem.splitLabel}</span>
+                            )}
+                          </div>
+                        )}
+                      </TableCell>
                       <TableCell className="text-sm">{item.color}</TableCell>
                       <TableCell className="text-sm">{item.size}</TableCell>
                       <TableCell className="text-right font-mono text-sm">
@@ -310,6 +345,11 @@ export function ProductionClient({
                               {pendingMap.get(item.id)!.type === "delete" ? "Pending delete" : "Pending edit"}
                             </Badge>
                           )}
+                          {pendingSplitMap.has(item.id) && (
+                            <Badge variant="warning" className="gap-1 text-[10px]">
+                              Pending split
+                            </Badge>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -321,6 +361,9 @@ export function ProductionClient({
                           canEditDirect={canEditDirect}
                           canEditRequest={canEditRequest}
                           pendingRequest={pendingMap.get(item.id) ?? null}
+                          canSplitDirect={canSplitDirect}
+                          canSplitRequest={canSplitRequest}
+                          pendingSplit={pendingSplitMap.get(item.id) ?? null}
                           currentUserId={currentUserId}
                         />
                       </TableCell>

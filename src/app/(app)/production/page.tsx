@@ -10,8 +10,14 @@ export default async function ProductionPage() {
   if (!hasPermission(user.role, "po_items.view")) redirect("/dashboard");
 
   const suppliers = await listSuppliersForFilter();
+
+  // CR9 — edit approval workflow perms
   const canEditDirect = hasPermission(user.role, "po_items.edit_direct");
   const canEditRequest = hasPermission(user.role, "po_items.edit_request");
+
+  // CR10 — split approval workflow perms
+  const canSplitDirect = hasPermission(user.role, "po_items.split_direct");
+  const canSplitRequest = hasPermission(user.role, "po_items.split_request");
 
   return (
     <ProductionClient
@@ -21,6 +27,8 @@ export default async function ProductionPage() {
       currentUserId={user.uid}
       canEditDirect={canEditDirect}
       canEditRequest={canEditRequest}
+      canSplitDirect={canSplitDirect}
+      canSplitRequest={canSplitRequest}
     />
   );
 }

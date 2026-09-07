@@ -25,6 +25,10 @@ export type Permission =
   | "po_items.edit_direct"        // edit/delete without approval
   | "po_items.edit_request"       // submit a request that needs approval
   | "po_items.edit_approve"       // approve/reject others' requests
+  // PO item splits (CR10 — partial-shipment splits)
+  | "po_items.split_direct"       // split without approval (manager, admin)
+  | "po_items.split_request"      // submit a split request that needs approval (merchant)
+  | "po_items.split_approve"      // approve/reject others' split requests
   // Containers
   | "containers.view" | "containers.create" | "containers.assign" | "containers.seal"
   // Vessels
@@ -44,6 +48,7 @@ const ALL: Permission[] = [
   "purchase_orders.view", "purchase_orders.upload", "purchase_orders.update", "purchase_orders.delete",
   "po_items.view", "po_items.update_status", "po_items.update_cbm", "po_items.assign_container",
   "po_items.edit_direct", "po_items.edit_request", "po_items.edit_approve",
+  "po_items.split_direct", "po_items.split_request", "po_items.split_approve",
   "containers.view", "containers.create", "containers.assign", "containers.seal",
   "vessels.view", "vessels.create", "vessels.update", "vessels.dispatch",
   "packing_lists.view", "packing_lists.generate", "packing_lists.export",
@@ -61,6 +66,7 @@ export const PERMISSIONS_BY_ROLE: Record<Role, Permission[]> = {
     "purchase_orders.view", "purchase_orders.upload", "purchase_orders.update",
     "po_items.view", "po_items.assign_container",
     "po_items.edit_direct", "po_items.edit_request", "po_items.edit_approve",
+    "po_items.split_direct", "po_items.split_request", "po_items.split_approve",
     "containers.view", "containers.create", "containers.assign", "containers.seal",
     "vessels.view", "vessels.create", "vessels.update", "vessels.dispatch",
     "packing_lists.view", "packing_lists.generate", "packing_lists.export",
@@ -75,6 +81,7 @@ export const PERMISSIONS_BY_ROLE: Record<Role, Permission[]> = {
     "purchase_orders.view", "purchase_orders.upload", "purchase_orders.update",
     "po_items.view", "po_items.assign_container",
     "po_items.edit_request",       // can request only — not direct, not approve
+    "po_items.split_request",      // can request splits — approval required
     "containers.view", "containers.create", "containers.assign", "containers.seal",
     "vessels.view", "vessels.create", "vessels.update", "vessels.dispatch",
     "packing_lists.view", "packing_lists.generate", "packing_lists.export",

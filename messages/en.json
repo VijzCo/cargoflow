@@ -63,7 +63,8 @@
     "Planned": "Planned",
     "Loading": "Loading",
     "Sailed": "Sailed",
-    "Delivered": "Delivered"
+    "Delivered": "Delivered",
+    "Split": "Split"
   },
   "category": {
     "Fabric": "Fabric",
@@ -494,5 +495,63 @@
     "rejectToast": "Rejected.",
     "cancelToast": "Cancelled.",
     "cancelConfirm": "Cancel this pending request?"
+  },
+  "splits": {
+    "title": "Splits",
+    "requestTitle": "Request item split",
+    "directTitle": "Split item",
+    "originalItem": "Original item",
+    "splitInto": "Split into {count} shipments",
+    "total": "Total: {sum} / {parent} {unit}",
+    "over": "over by",
+    "short": "short by",
+    "addLot": "Add another lot ({current}/{max})",
+    "lot": "Lot {n}",
+    "lotOf": "Lot {n} of {total}",
+    "quantity": "Quantity",
+    "deliveryDate": "Delivery date",
+    "label": "Label (optional)",
+    "labelPlaceholder": "e.g. Sampling batch",
+    "reasonCategory": "Reason category",
+    "reasonDetails": "Details",
+    "reasonPlaceholder": "Additional context (optional)",
+    "reasonPlaceholderOther": "Explain the reason",
+    "reason": {
+      "supplier_capacity": "Supplier capacity limit",
+      "customer_early_lot": "Customer needs early lot",
+      "logistics_constraint": "Logistics / shipping constraint",
+      "other": "Other (specify below)"
+    },
+    "splitNow": "Split now",
+    "submitApproval": "Submit for approval",
+    "note": "Splitting creates new items and marks the original as \"Split\". Each new item's CBM and package count starts blank — the supplier will redeclare as they produce each lot. Fabric details carry to all children.",
+    "toastRequested": "Split request submitted for approval.",
+    "toastApplied": "Split into {count} items.",
+    "toastApproved": "Split approved and applied.",
+    "toastRejected": "Split rejected.",
+    "toastCancelled": "Split request cancelled.",
+    "badgeSplitParent": "Already split — see child items",
+    "badgeSplitChild": "Split child — cannot split again",
+    "badgePendingByOther": "Pending split by another user",
+    "menuRequestSplit": "Request split",
+    "menuSplitItem": "Split item",
+    "menuCancelMySplit": "Cancel my pending split",
+    "approvals": {
+      "tabEdits": "Edit requests",
+      "tabSplits": "Split requests",
+      "pendingSplits": "Pending splits ({n})",
+      "pendingSplitsDescApprover": "Approving a split immediately creates the child items. Self-approval is blocked.",
+      "pendingSplitsDescRequester": "Waiting for a manager or super admin to review.",
+      "noPendingSplits": "No pending split requests.",
+      "recentSplits": "Recently resolved splits",
+      "recentSplitsDesc": "The last 50 closed split requests.",
+      "reviewTitle": "Split request",
+      "proposedSplit": "Proposed split ({n} lots)",
+      "childrenCreated": "{n} child items created",
+      "approveAndApply": "Approve & apply",
+      "quantitiesMustMatch": "Quantities must sum to {parent}. Currently {sum}.",
+      "reasonOtherRequired": "Please describe the reason when choosing Other.",
+      "positiveQuantitiesRequired": "Every split must have a positive quantity."
+    }
   }
 }

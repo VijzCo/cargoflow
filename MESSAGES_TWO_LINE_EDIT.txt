@@ -1,0 +1,43 @@
+// Add these two ONE-LINE changes to your messages files:
+
+// ============ messages/en.json ============
+// In the "status" object, add:
+//     "Split": "Split"
+
+// ============ messages/zh.json ============
+// In the "status" object, add:
+//     "Split": "已拆分"
+
+// The full "status" object should look like this in en.json after edit:
+//   "status": {
+//     "Pending": "Pending",
+//     "Started": "Started",
+//     "In Progress": "In Progress",
+//     "Completed": "Completed",
+//     "Loaded": "Loaded",
+//     "Shipped": "Shipped",
+//     "Open": "Open",
+//     "Sealed": "Sealed",
+//     "Planned": "Planned",
+//     "Loading": "Loading",
+//     "Sailed": "Sailed",
+//     "Delivered": "Delivered",
+//     "Split": "Split"
+//   },
+//
+// And in zh.json:
+//   "status": {
+//     "Pending": "待处理",
+//     "Started": "已开始",
+//     "In Progress": "进行中",
+//     "Completed": "已完成",
+//     "Loaded": "已装柜",
+//     "Shipped": "已发货",
+//     "Open": "开放",
+//     "Sealed": "已封箱",
+//     "Planned": "计划中",
+//     "Loading": "装柜中",
+//     "Sailed": "已开航",
+//     "Delivered": "已送达",
+//     "Split": "已拆分"
+//   },
