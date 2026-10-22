@@ -25,10 +25,10 @@ export interface UserDoc {
   displayName: string;
   role: Role;
   active: boolean;
-  supplierId?: string;            // required when role === "supplier"
+  supplierId?: string;
   createdAt: Timestamp | null;
   updatedAt: Timestamp | null;
-  createdBy: string;              // uid of admin who created the user
+  createdBy: string;
   lastLoginAt?: Timestamp | null;
 }
 
@@ -38,8 +38,8 @@ export interface UserDoc {
 
 export interface SupplierDoc {
   id: string;
-  name: string;                   // company name as it appears on POs
-  aliases: string[];              // alternate spellings for fuzzy matching
+  name: string;
+  aliases: string[];
   contactPerson?: string;
   email?: string;
   phone?: string;
@@ -51,7 +51,7 @@ export interface SupplierDoc {
 }
 
 // =============================================================================
-// Merchants (customer entities — for filtering / branding)
+// Merchants
 // =============================================================================
 
 export interface MerchantDoc {
@@ -75,14 +75,14 @@ export type POItemStatus =
   | "Completed"
   | "Loaded"
   | "Shipped"
-  | "Split";               // CR10 — parent has been split into children; no longer active
+  | "Split";               // CR10 — parent kept for history
 
 export interface PurchaseOrderDoc {
   id: string;
-  poNumber: string;               // primary PO number (first in poNumbers list)
-  poNumbers: string[];            // full list (supports multi-PO comma entries)
+  poNumber: string;
+  poNumbers: string[];
   supplierId: string;
-  supplierName: string;           // denormalized for read-side display
+  supplierName: string;
   orderNo?: string;
   salesChannel?: string;
   totalItems: number;
@@ -96,7 +96,7 @@ export interface PurchaseOrderDoc {
 
 export interface POItemDoc {
   id: string;
-  poId: string;                   // parent PurchaseOrderDoc.id
+  poId: string;
   poNumbers: string[];
   supplierId: string;
   supplierName: string;
@@ -108,20 +108,15 @@ export interface POItemDoc {
   unitPrice?: number;
   category: Category;
   description?: string;
-  deliveryDate?: string;          // ISO yyyy-mm-dd
+  deliveryDate?: string;
   salesChannel?: string;
   remarks?: string;
-  uniqueKey: string;              // PO|STYLE|COLOR|SIZE, uppercased
+  uniqueKey: string;
 
-  // Fabric-only details (only meaningful when category === "Fabric").
-  // Once a non-empty value is set (via upload or merchant edit), it is locked.
+  // Fabric details (locked once set)
   composition?: string;
   reference?: string;
   shade?: string;
-  // Locked flag per field — once true, the field is read-only forever.
-  // We DON'T re-derive lock state from "is value present" because we want
-  // upload-from-Excel-with-value behavior (locked) to be the same as
-  // "merchant set this via dialog" (locked).
   fabricLocks?: {
     composition?: boolean;
     reference?: boolean;
@@ -130,27 +125,26 @@ export interface POItemDoc {
 
   // Supplier-updatable fields
   status: POItemStatus;
-  cbm: number;                    // CBM declared by supplier
-  packageCount: number;           // rolls / boxes
+  cbm: number;
+  packageCount: number;
   grossWeight?: number;
   netWeight?: number;
   supplierRemarks?: string;
 
-  // Container & shipping refs (assigned by merchant)
+  // Container & shipping refs
   containerId?: string;
   vesselId?: string;
   packingListId?: string;
 
-  // CR10 — split lineage. When present, this item is either a parent that
-  // has been split (status === "Split") or a child produced by a split.
-  splitFromItemId?: string;       // parent item's id (children only)
-  splitGroupId?: string;          // shared across all siblings (children)
-  splitIndex?: number;            // 1-based position among siblings (children)
-  splitTotal?: number;            // total siblings in the group (children)
-  splitLabel?: string;            // optional human-readable label (e.g. "Sampling batch")
-  splitChildIds?: string[];       // parent only: ids of the child items produced
-  splitAt?: Timestamp | null;     // when the split was applied
-  splitBy?: string;               // uid of user who applied the split
+  // CR10 — split lineage
+  splitFromItemId?: string;
+  splitGroupId?: string;
+  splitIndex?: number;
+  splitTotal?: number;
+  splitLabel?: string;
+  splitChildIds?: string[];
+  splitAt?: Timestamp | null;
+  splitBy?: string;
 
   createdAt: Timestamp | null;
   updatedAt: Timestamp | null;
@@ -170,35 +164,53 @@ export const CONTAINER_CAPACITY: Record<ContainerType, number> = {
 
 export interface ContainerDoc {
   id: string;
-  containerNumber: string;        // System identifier — used in URLs, audit logs, and as a fallback display name.
-                                  // Auto-generated when not supplied at creation (e.g. CTR-2026-04-001).
-  carrierNumber?: string;         // The real physical carrier-issued ID (e.g. MSCU1234567).
-                                  // Editable while status === "Open", locked once sealed.
-                                  // Displayed everywhere if set; falls back to containerNumber when empty.
+  containerNumber: string;
+  carrierNumber?: string;
   type: ContainerType;
-  capacityCbm: number;            // nominal capacity
-  usableCbm: number;              // capacityCbm * settings.usablePercent
-  loadedCbm: number;              // sum of assigned items
-  utilization: number;            // loadedCbm / usableCbm (0-1)
+  capacityCbm: number;
+  usableCbm: number;
+  loadedCbm: number;
+  utilization: number;
   vesselId?: string;
-  supplierIds: string[];          // for RBAC reads
-  itemIds: string[];              // denormalized item list
+  supplierIds: string[];
+  itemIds: string[];
   status: "Open" | "Sealed" | "Shipped";
   createdAt: Timestamp | null;
   updatedAt: Timestamp | null;
 }
 
+export type VesselStatus = "Planned" | "Loading" | "Sailed" | "Delivered";
+
+/** CR11 — one entry per ETD/ETA revision. Immutable; appended to vessel.revisions. */
+export interface VesselDateRevision {
+  id: string;
+  revisedAt: Timestamp | null;
+  revisedBy: string;
+  revisedByEmail: string;
+  revisedByName?: string;
+  field: "etd" | "eta" | "both";
+  previousEtd?: string;
+  newEtd?: string;
+  previousEta?: string;
+  newEta?: string;
+  reason?: string;
+}
+
 export interface VesselDoc {
   id: string;
-  vesselId: string;               // human-readable vessel ID
+  vesselId: string;
   vesselName?: string;
-  shipmentDate?: string;          // ISO
-  etd?: string;                   // estimated time of departure
-  eta?: string;                   // estimated time of arrival
+  shipmentDate?: string;
+  etd?: string;
+  eta?: string;
   destination: string;
   containerIds: string[];
   supplierIds: string[];
-  status: "Planned" | "Loading" | "Sailed" | "Delivered";
+  status: VesselStatus;
+
+  // CR11 — audit trail of ETD/ETA revisions. Appended, never pruned.
+  revisions?: VesselDateRevision[];
+
   createdAt: Timestamp | null;
   updatedAt: Timestamp | null;
 }
@@ -209,7 +221,7 @@ export interface VesselDoc {
 
 export interface PackingListDoc {
   id: string;
-  packingListNumber: string;      // PL-{VesselID}-{ContainerNo}
+  packingListNumber: string;
   vesselId: string;
   containerId: string;
   containerNumber: string;
@@ -252,7 +264,7 @@ export interface NotificationDoc {
 }
 
 // =============================================================================
-// Sales Channels (admin-editable)
+// Sales Channels
 // =============================================================================
 
 export interface SalesChannelDoc {
@@ -263,7 +275,7 @@ export interface SalesChannelDoc {
 }
 
 // =============================================================================
-// Settings (singleton at settings/global)
+// Settings
 // =============================================================================
 
 export interface SettingsDoc {
@@ -271,16 +283,16 @@ export interface SettingsDoc {
   companyName: string;
   systemTitle: string;
   logoUrl?: string;
-  themePrimary?: string;          // hex
+  themePrimary?: string;
   themeAccent?: string;
-  containerUsablePercent: number; // e.g. 0.92 → 92% of nominal CBM is usable
+  containerUsablePercent: number;
   categoryKeywords: Record<Category, string[]>;
   updatedAt: Timestamp | null;
   updatedBy: string;
 }
 
 // =============================================================================
-// Activity Log (audit trail)
+// Activity Log
 // =============================================================================
 
 export type ActivityAction =
@@ -289,22 +301,23 @@ export type ActivityAction =
   | "item.status_change" | "item.cbm_update"
   | "container.create" | "container.assign" | "container.seal" | "container.rename"
   | "vessel.create" | "vessel.dispatch"
+  | "vessel.dates_revised"              // CR11
   | "packing_list.generate"
   | "settings.update"
   | "item.fabric_update"
-  | "item.direct_edit"           // edited directly by super_admin or merchant_manager
-  | "item.direct_delete"         // deleted directly
-  | "item.edit_requested"        // merchant submitted an edit request
-  | "item.delete_requested"      // merchant submitted a delete request
-  | "item.request_approved"      // approver approved
-  | "item.request_rejected"      // approver rejected
-  | "item.request_cancelled"     // merchant cancelled their own pending request
+  | "item.direct_edit"                  // CR9
+  | "item.direct_delete"
+  | "item.edit_requested"
+  | "item.delete_requested"
+  | "item.request_approved"
+  | "item.request_rejected"
+  | "item.request_cancelled"
   // CR10 — split workflow
-  | "item.split_requested"       // merchant submitted a split request
-  | "item.split_approved"        // approver approved a split request (and applied it)
-  | "item.split_rejected"        // approver rejected a split request
-  | "item.split_cancelled"       // merchant cancelled their own pending split request
-  | "item.split_applied_direct"; // manager/admin split directly without approval
+  | "item.split_requested"
+  | "item.split_approved"
+  | "item.split_rejected"
+  | "item.split_cancelled"
+  | "item.split_applied_direct";
 
 export interface ActivityLogDoc {
   id: string;
@@ -319,13 +332,12 @@ export interface ActivityLogDoc {
 }
 
 // =============================================================================
-// Item edit requests (approval workflow)
+// Item edit requests (CR9)
 // =============================================================================
 
 export type EditRequestType = "update" | "delete";
 export type EditRequestStatus = "pending" | "approved" | "rejected" | "cancelled";
 
-/** Fields editable through this workflow. Keys map directly onto POItemDoc fields. */
 export type ItemEditableField =
   | "poNumbers" | "style" | "color" | "size" | "quantity" | "unit" | "unitPrice"
   | "category" | "description" | "deliveryDate" | "salesChannel" | "remarks";
@@ -334,48 +346,41 @@ export interface ItemEditRequestDoc {
   id: string;
   itemId: string;
   poId: string;
-  supplierId: string;             // copied at request time for RBAC isolation
+  supplierId: string;
   type: EditRequestType;
   status: EditRequestStatus;
 
-  // For "update" requests:
-  // proposedChanges holds ONLY the fields the requester wants to change,
-  // with their new values. previousValues is the snapshot for diffing.
   proposedChanges?: Partial<Record<ItemEditableField, unknown>>;
   previousValues?: Partial<Record<ItemEditableField, unknown>>;
 
-  reason?: string;                // optional justification from the requester
+  reason?: string;
 
-  requestedBy: string;            // uid
+  requestedBy: string;
   requestedByEmail: string;
   requestedAt: Timestamp | null;
 
-  // Set when status leaves "pending"
-  resolvedBy?: string;            // uid of approver/rejector
+  resolvedBy?: string;
   resolvedByEmail?: string;
   resolvedAt?: Timestamp | null;
-  resolverNote?: string;          // approver/rejector comment
+  resolverNote?: string;
 }
 
 // =============================================================================
-// Item split requests (CR10 — partial-shipment splits, approval workflow)
+// Item split requests (CR10 — partial-shipment splits)
 // =============================================================================
 
-/** Predefined reason categories for a split, for reporting / analytics. */
 export type SplitReasonCategory =
   | "supplier_capacity"
   | "customer_early_lot"
   | "logistics_constraint"
   | "other";
 
-/** Definition of a single child produced by a split. */
 export interface SplitChildInput {
   quantity: number;
-  deliveryDate?: string;          // ISO yyyy-mm-dd; defaults to parent's date
-  label?: string;                 // optional short label like "Sampling batch"
+  deliveryDate?: string;
+  label?: string;
 }
 
-/** Snapshot of a fully-planned split (used inside a request or by direct apply). */
 export interface SplitPlan {
   children: SplitChildInput[];
   reasonCategory: SplitReasonCategory;
@@ -384,13 +389,13 @@ export interface SplitPlan {
 
 export interface ItemSplitRequestDoc {
   id: string;
-  itemId: string;                 // parent POItemDoc.id
+  itemId: string;
   poId: string;
-  supplierId: string;             // copied at request time for RBAC isolation
-  status: EditRequestStatus;      // reuse the same lifecycle: pending / approved / rejected / cancelled
+  supplierId: string;
+  status: EditRequestStatus;
 
-  plan: SplitPlan;                // the proposed split
-  parentSnapshot: {               // captured at request time for audit / diffing
+  plan: SplitPlan;
+  parentSnapshot: {
     style: string;
     color: string;
     size: string;
@@ -408,6 +413,5 @@ export interface ItemSplitRequestDoc {
   resolvedAt?: Timestamp | null;
   resolverNote?: string;
 
-  // Populated after status becomes "approved" — ids of newly-created child items
   createdChildIds?: string[];
 }

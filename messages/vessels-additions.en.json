@@ -1,0 +1,38 @@
+{
+  "_": "CR11 — merge these keys into messages/en.json inside the existing `vessels` namespace",
+
+  "revise": {
+    "button": "Revise ETD / ETA",
+    "dialogTitle": "Revise ETD / ETA",
+    "dialogDesc": "{vesselId} — status {status}",
+    "etdLabel": "ETD",
+    "etaLabel": "ETA",
+    "etdLockedSailed": "Locked — vessel has already sailed.",
+    "etaLockedDelivered": "Locked — vessel is delivered.",
+    "currentValue": "Current: {date}",
+    "reasonLabel": "Reason (optional)",
+    "reasonPlaceholder": "e.g. Weather delay, port congestion, customer request",
+    "saveButton": "Save revision",
+    "savingButton": "Saving...",
+    "savedToast": "Dates revised.",
+    "failedToast": "Failed to revise dates.",
+    "invalidOrder": "ETA cannot be earlier than ETD.",
+    "noChanges": "No changes to apply.",
+    "bothLocked": "This vessel is {status}. ETD and ETA can no longer be revised.",
+    "etdLockedForStatus": "ETD can't be revised when vessel status is \"{status}\".",
+    "etaLockedForStatus": "ETA can't be revised when vessel status is \"{status}\"."
+  },
+
+  "history": {
+    "title": "Revision history",
+    "entryCount": "{count} {count, plural, one {entry} other {entries}}",
+    "description": "Every ETD / ETA change on this vessel, newest first.",
+    "empty": "No revisions yet. The first revision will appear here.",
+    "fromArrowTo": "{from} → {to}",
+    "fieldETD": "ETD",
+    "fieldETA": "ETA",
+    "fieldBoth": "ETD + ETA",
+    "showButton": "Show",
+    "hideButton": "Hide"
+  }
+}

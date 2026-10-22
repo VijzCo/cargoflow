@@ -1,0 +1,38 @@
+{
+  "_": "CR11 — 将以下键合并到 messages/zh.json 的 `vessels` 命名空间内",
+
+  "revise": {
+    "button": "修改 ETD / ETA",
+    "dialogTitle": "修改预计开航 / 到达",
+    "dialogDesc": "{vesselId} — 状态 {status}",
+    "etdLabel": "预计开航 (ETD)",
+    "etaLabel": "预计到达 (ETA)",
+    "etdLockedSailed": "已锁定 — 船舶已开航。",
+    "etaLockedDelivered": "已锁定 — 船舶已送达。",
+    "currentValue": "当前:{date}",
+    "reasonLabel": "原因(可选)",
+    "reasonPlaceholder": "如:天气延误、港口拥堵、客户要求",
+    "saveButton": "保存修改",
+    "savingButton": "保存中...",
+    "savedToast": "日期已修改。",
+    "failedToast": "日期修改失败。",
+    "invalidOrder": "预计到达不能早于预计开航。",
+    "noChanges": "无变更可应用。",
+    "bothLocked": "该船舶状态为 {status}。ETD 和 ETA 不可再修改。",
+    "etdLockedForStatus": "船舶状态为「{status}」时无法修改 ETD。",
+    "etaLockedForStatus": "船舶状态为「{status}」时无法修改 ETA。"
+  },
+
+  "history": {
+    "title": "修改历史",
+    "entryCount": "{count} 条记录",
+    "description": "该船舶所有 ETD / ETA 的修改,最新在前。",
+    "empty": "暂无修改记录。首次修改将显示于此。",
+    "fromArrowTo": "{from} → {to}",
+    "fieldETD": "ETD",
+    "fieldETA": "ETA",
+    "fieldBoth": "ETD + ETA",
+    "showButton": "显示",
+    "hideButton": "隐藏"
+  }
+}

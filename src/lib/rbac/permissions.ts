@@ -3,14 +3,6 @@ import type { Role } from "@/types";
 // =============================================================================
 // CargoFlow Permission Map
 // =============================================================================
-// One place defines what every role can do. Both UI (menu visibility) and
-// server-side checks read from here.
-//
-// Permission naming: <module>.<action>
-//   modules:  users, suppliers, purchase_orders, po_items, containers,
-//             vessels, packing_lists, reports, settings, activity_logs
-//   actions:  view, create, update, delete, export
-// =============================================================================
 
 export type Permission =
   // Users
@@ -21,18 +13,19 @@ export type Permission =
   | "purchase_orders.view" | "purchase_orders.upload" | "purchase_orders.update" | "purchase_orders.delete"
   // PO items
   | "po_items.view" | "po_items.update_status" | "po_items.update_cbm" | "po_items.assign_container"
-  // PO item edits (approval workflow)
-  | "po_items.edit_direct"        // edit/delete without approval
-  | "po_items.edit_request"       // submit a request that needs approval
-  | "po_items.edit_approve"       // approve/reject others' requests
-  // PO item splits (CR10 — partial-shipment splits)
-  | "po_items.split_direct"       // split without approval (manager, admin)
-  | "po_items.split_request"      // submit a split request that needs approval (merchant)
-  | "po_items.split_approve"      // approve/reject others' split requests
+  // PO item edits (CR9 approval workflow)
+  | "po_items.edit_direct"
+  | "po_items.edit_request"
+  | "po_items.edit_approve"
+  // PO item splits (CR10 partial-shipment workflow)
+  | "po_items.split_direct"
+  | "po_items.split_request"
+  | "po_items.split_approve"
   // Containers
   | "containers.view" | "containers.create" | "containers.assign" | "containers.seal"
   // Vessels
   | "vessels.view" | "vessels.create" | "vessels.update" | "vessels.dispatch"
+  | "vessels.revise_dates"           // CR11
   // Packing lists
   | "packing_lists.view" | "packing_lists.generate" | "packing_lists.export"
   // Reports
@@ -50,7 +43,7 @@ const ALL: Permission[] = [
   "po_items.edit_direct", "po_items.edit_request", "po_items.edit_approve",
   "po_items.split_direct", "po_items.split_request", "po_items.split_approve",
   "containers.view", "containers.create", "containers.assign", "containers.seal",
-  "vessels.view", "vessels.create", "vessels.update", "vessels.dispatch",
+  "vessels.view", "vessels.create", "vessels.update", "vessels.dispatch", "vessels.revise_dates",
   "packing_lists.view", "packing_lists.generate", "packing_lists.export",
   "reports.view", "reports.export",
   "settings.view", "settings.update",
@@ -68,7 +61,7 @@ export const PERMISSIONS_BY_ROLE: Record<Role, Permission[]> = {
     "po_items.edit_direct", "po_items.edit_request", "po_items.edit_approve",
     "po_items.split_direct", "po_items.split_request", "po_items.split_approve",
     "containers.view", "containers.create", "containers.assign", "containers.seal",
-    "vessels.view", "vessels.create", "vessels.update", "vessels.dispatch",
+    "vessels.view", "vessels.create", "vessels.update", "vessels.dispatch", "vessels.revise_dates",
     "packing_lists.view", "packing_lists.generate", "packing_lists.export",
     "reports.view", "reports.export",
     "settings.view",
@@ -80,8 +73,8 @@ export const PERMISSIONS_BY_ROLE: Record<Role, Permission[]> = {
     "suppliers.view", "suppliers.create", "suppliers.update",
     "purchase_orders.view", "purchase_orders.upload", "purchase_orders.update",
     "po_items.view", "po_items.assign_container",
-    "po_items.edit_request",       // can request only — not direct, not approve
-    "po_items.split_request",      // can request splits — approval required
+    "po_items.edit_request",
+    "po_items.split_request",
     "containers.view", "containers.create", "containers.assign", "containers.seal",
     "vessels.view", "vessels.create", "vessels.update", "vessels.dispatch",
     "packing_lists.view", "packing_lists.generate", "packing_lists.export",
@@ -90,7 +83,7 @@ export const PERMISSIONS_BY_ROLE: Record<Role, Permission[]> = {
   ],
 
   supplier: [
-    "purchase_orders.view",     // limited to their own items via Firestore rules
+    "purchase_orders.view",
     "po_items.view",
     "po_items.update_status",
     "po_items.update_cbm",
@@ -104,7 +97,7 @@ export const PERMISSIONS_BY_ROLE: Record<Role, Permission[]> = {
     "purchase_orders.view",
     "po_items.view", "po_items.assign_container",
     "containers.view", "containers.create", "containers.assign", "containers.seal",
-    "vessels.view", "vessels.update",
+    "vessels.view", "vessels.update", "vessels.revise_dates",
     "packing_lists.view", "packing_lists.generate", "packing_lists.export",
     "reports.view",
   ],
