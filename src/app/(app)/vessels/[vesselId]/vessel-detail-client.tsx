@@ -13,6 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AttachContainerDialog } from "@/components/vessels/attach-container-dialog";
 import { GeneratePackingListsDialog } from "@/components/packing-lists/generate-dialog";
+import { ReviseDatesButton } from "@/components/vessels/revise-dates-button";
+import { RevisionHistoryCard, type RevisionView } from "@/components/vessels/revision-history-card";
 import { dispatchVessel, detachContainerFromVessel, type VesselView } from "@/lib/utils/vessel-actions";
 import { formatDate } from "@/lib/utils/format";
 
@@ -23,11 +25,16 @@ interface ContainerLite {
 
 export function VesselDetailClient({
   vessel, containers, canManage, canDispatch,
+  // CR11
+  canReviseDates = false,
+  revisions = [],
 }: {
   vessel: VesselView;
   containers: ContainerLite[];
   canManage: boolean;
   canDispatch: boolean;
+  canReviseDates?: boolean;
+  revisions?: RevisionView[];
 }) {
   const router = useRouter();
   const [attachOpen, setAttachOpen] = useState(false);
@@ -87,6 +94,19 @@ export function VesselDetailClient({
           {vessel.vesselName && <p className="mt-1 text-muted-foreground">{vessel.vesselName}</p>}
         </div>
         <div className="flex flex-wrap gap-2">
+          {/* CR11 — Revise ETD / ETA */}
+          {canReviseDates && (
+            <ReviseDatesButton
+              vessel={{
+                id: vessel.id,
+                vesselId: vessel.vesselId,
+                vesselName: vessel.vesselName,
+                status: vessel.status,
+                etd: vessel.etd,
+                eta: vessel.eta,
+              }}
+            />
+          )}
           {canAttach && (
             <Button variant="outline" onClick={() => setAttachOpen(true)} disabled={working}>
               <Plus className="h-4 w-4" /> Attach containers
@@ -187,6 +207,9 @@ export function VesselDetailClient({
           )}
         </CardContent>
       </Card>
+
+      {/* CR11 — revision history (shown to all roles that reach this page) */}
+      <RevisionHistoryCard revisions={revisions} />
 
       <AttachContainerDialog
         vesselId={vessel.id}
